@@ -110,27 +110,30 @@ export default function PizzaBuilder() {
     setSelectedTopping(null);
   };
 
-  const generateToppingPositions = useCallback((placement: string): ToppingPosition[] => {
-    const positions = [];
-    const toppingCount = 10;
+  const generateToppingPositions = useCallback(
+    (placement: string): ToppingPosition[] => {
+      const positions = [];
+      const toppingCount = 10;
 
-    for (let i = 0; i < toppingCount; i++) {
-      let x, y;
-      if (placement === "full") {
-        x = Math.random();
-        y = Math.random();
-      } else if (placement === "left") {
-        x = Math.random() * 0.5;
-        y = Math.random();
-      } else {
-        x = Math.random() * 0.5 + 0.5;
-        y = Math.random();
+      for (let i = 0; i < toppingCount; i++) {
+        let x, y;
+        if (placement === "full") {
+          x = Math.random();
+          y = Math.random();
+        } else if (placement === "left") {
+          x = Math.random() * 0.5;
+          y = Math.random();
+        } else {
+          x = Math.random() * 0.5 + 0.5;
+          y = Math.random();
+        }
+        positions.push({ x, y });
       }
-      positions.push({ x, y });
-    }
 
-    return positions;
-  }, []);
+      return positions;
+    },
+    []
+  );
 
   const handleClear = () => {
     setPizzaToppings([]);
@@ -138,15 +141,20 @@ export default function PizzaBuilder() {
 
   const calculateTotal = () => {
     const basePrice = sizePrices[pizzaSize];
-    const toppingsPrice = pizzaToppings.reduce((total, topping) => total + topping.price, 0);
+    const toppingsPrice = pizzaToppings.reduce(
+      (total, topping) => total + topping.price,
+      0
+    );
     return (basePrice + toppingsPrice).toFixed(2);
   };
 
   const handleCompleteOrder = () => {
     const total = calculateTotal();
-    alert(`Order Summary:\nSize: ${pizzaSize.toUpperCase()}\nToppings: ${pizzaToppings
-      .map((t) => `${t.name} (${t.placement})`)
-      .join(", ")}\nTotal: $${total}\nThank you for your order!`);
+    alert(
+      `Order Summary:\nSize: ${pizzaSize.toUpperCase()}\nToppings: ${pizzaToppings
+        .map((t) => `${t.name} (${t.placement})`)
+        .join(", ")}\nTotal: $${total}\nThank you for your order!`
+    );
   };
 
   const renderTopping = (topping: Topping) => {
@@ -207,7 +215,7 @@ export default function PizzaBuilder() {
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
               >
-                {pizzaToppings.map((topping: any) => renderTopping(topping))}
+                {pizzaToppings.map((topping: Topping) => renderTopping(topping))}
               </div>
             </div>
 
@@ -255,7 +263,7 @@ export default function PizzaBuilder() {
 
             <div className="mt-4 space-y-4">
               <ScrollArea className="h-32 border rounded-md p-2">
-                {pizzaToppings.map((topping: any) => (
+                {pizzaToppings.map((topping: Topping) => (
                   <div
                     key={topping.id}
                     className="flex justify-between items-center mb-2"
@@ -266,7 +274,7 @@ export default function PizzaBuilder() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => removeTopping(topping.id)}
+                      onClick={() => topping.id !== undefined && removeTopping(topping.id)}
                     >
                       <X className="h-4 w-4" />
                     </Button>
@@ -297,9 +305,11 @@ export default function PizzaBuilder() {
                   onTouchStart={(e) => handleTouchStart(e, topping)}
                 >
                   <div className="w-16 h-16 mx-auto mb-2 relative">
-                    <img
+                    <Image
                       src={topping.image}
                       alt={topping.name}
+                      width={64}
+                      height={64}
                       className="w-full h-full object-contain"
                       style={{ mixBlendMode: "multiply" }}
                     />
