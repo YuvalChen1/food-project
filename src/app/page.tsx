@@ -1,11 +1,28 @@
 "use client";
 
 import React, { useState, useRef, useCallback } from "react";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { UtensilsCrossed, X } from "lucide-react";
 
-const toppings = [
+interface Topping {
+  name: string;
+  image: string;
+  price: number;
+  id?: number;
+  x?: number;
+  y?: number;
+  placement?: string;
+  positions?: ToppingPosition[];
+}
+
+interface ToppingPosition {
+  x: number;
+  y: number;
+}
+
+const toppings: Topping[] = [
   { name: "Pepperoni", image: "/toppings/pepperoni.png", price: 1.5 },
   { name: "Mushrooms", image: "/toppings/mushrooms.png", price: 1 },
   { name: "Onions", image: "/toppings/onions.png", price: 0.75 },
@@ -16,61 +33,59 @@ const toppings = [
   { name: "Green peppers", image: "/toppings/green-peppers.png", price: 0.75 },
 ];
 
-const sizePrices: any = {
+const sizePrices: Record<string, number> = {
   s: 8,
   m: 10,
   l: 12,
 };
 
 export default function PizzaBuilder() {
-  const [pizzaSize, setPizzaSize] = useState("m");
-  const [pizzaToppings, setPizzaToppings] = useState<any>([]);
-  const [selectedTopping, setSelectedTopping] = useState<any>(null);
-  const [toppingPlacement, setToppingPlacement] = useState("full");
-  const pizzaRef = useRef<any>(null);
+  const [pizzaSize, setPizzaSize] = useState<string>("m");
+  const [pizzaToppings, setPizzaToppings] = useState<Topping[]>([]);
+  const [selectedTopping, setSelectedTopping] = useState<Topping | null>(null);
+  const [toppingPlacement, setToppingPlacement] = useState<string>("full");
+  const pizzaRef = useRef<HTMLDivElement>(null);
 
-  const handleDragStart = (e: any, topping: any) => {
+  const handleDragStart = (e: React.DragEvent, topping: Topping) => {
     e.dataTransfer.setData("topping", JSON.stringify(topping));
     setSelectedTopping(topping);
   };
 
-  const handleTouchStart = (e: any, topping: any) => {
+  const handleTouchStart = (e: React.TouchEvent, topping: Topping) => {
     setSelectedTopping(topping);
   };
 
-  const handleDragOver = (e: any) => {
+  const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
   };
 
-  const handleTouchMove = (e: any) => {
+  const handleTouchMove = (e: React.TouchEvent) => {
     e.preventDefault();
   };
 
-  const handleDrop = (e: any) => {
+  const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     addToppingToPizza(e.clientX, e.clientY);
   };
 
-  const handleTouchEnd = (e: any) => {
+  const handleTouchEnd = (e: React.TouchEvent) => {
     const touch = e.changedTouches[0];
     addToppingToPizza(touch.clientX, touch.clientY);
   };
 
-  const addToppingToPizza = (clientX: any, clientY: any) => {
-    if (!selectedTopping) return;
+  const addToppingToPizza = (clientX: number, clientY: number) => {
+    if (!selectedTopping || !pizzaRef.current) return;
 
     const pizzaRect = pizzaRef.current.getBoundingClientRect();
     const x = (clientX - pizzaRect.left) / pizzaRect.width;
     const y = (clientY - pizzaRect.top) / pizzaRect.height;
 
-    // Check if the topping already exists
     const existingToppingIndex = pizzaToppings.findIndex(
-      (t: any) => t.name === selectedTopping.name
+      (t) => t.name === selectedTopping.name
     );
 
     if (existingToppingIndex !== -1) {
-      // Update existing topping
-      const updatedToppings: any = [...pizzaToppings];
+      const updatedToppings = [...pizzaToppings];
       updatedToppings[existingToppingIndex] = {
         ...selectedTopping,
         id: Date.now(),
@@ -81,8 +96,7 @@ export default function PizzaBuilder() {
       };
       setPizzaToppings(updatedToppings);
     } else {
-      // Add new topping
-      const newTopping = {
+      const newTopping: Topping = {
         ...selectedTopping,
         id: Date.now(),
         x,
@@ -96,7 +110,7 @@ export default function PizzaBuilder() {
     setSelectedTopping(null);
   };
 
-  const generateToppingPositions = useCallback((placement: any) => {
+  const generateToppingPositions = useCallback((placement: string): ToppingPosition[] => {
     const positions = [];
     const toppingCount = 10;
 
@@ -109,7 +123,6 @@ export default function PizzaBuilder() {
         x = Math.random() * 0.5;
         y = Math.random();
       } else {
-        // right
         x = Math.random() * 0.5 + 0.5;
         y = Math.random();
       }
@@ -125,31 +138,25 @@ export default function PizzaBuilder() {
 
   const calculateTotal = () => {
     const basePrice = sizePrices[pizzaSize];
-    const toppingsPrice = pizzaToppings.reduce(
-      (total: any, topping: any) => total + topping.price,
-      0
-    );
+    const toppingsPrice = pizzaToppings.reduce((total, topping) => total + topping.price, 0);
     return (basePrice + toppingsPrice).toFixed(2);
   };
 
   const handleCompleteOrder = () => {
     const total = calculateTotal();
-    alert(`Order Summary:
-    Size: ${pizzaSize.toUpperCase()}
-    Toppings: ${pizzaToppings
-      .map((t: any) => `${t.name} (${t.placement})`)
-      .join(", ")}
-    Total: $${total}
-    
-    Thank you for your order!`);
+    alert(`Order Summary:\nSize: ${pizzaSize.toUpperCase()}\nToppings: ${pizzaToppings
+      .map((t) => `${t.name} (${t.placement})`)
+      .join(", ")}\nTotal: $${total}\nThank you for your order!`);
   };
 
-  const renderTopping = (topping: any) => {
-    return topping.positions.map((position: any, i: any) => (
-      <img
+  const renderTopping = (topping: Topping) => {
+    return topping.positions?.map((position, i) => (
+      <Image
         key={`${topping.id}-${i}`}
         src={topping.image}
         alt={topping.name}
+        width={24}
+        height={24}
         className="absolute w-6 h-6 object-contain pointer-events-none"
         style={{
           left: `${position.x * 100}%`,
@@ -161,8 +168,8 @@ export default function PizzaBuilder() {
     ));
   };
 
-  const removeTopping = (toppingId: any) => {
-    setPizzaToppings(pizzaToppings.filter((t: any) => t.id !== toppingId));
+  const removeTopping = (toppingId: number) => {
+    setPizzaToppings(pizzaToppings.filter((t) => t.id !== toppingId));
   };
 
   return (
