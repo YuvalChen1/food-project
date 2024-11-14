@@ -17,6 +17,7 @@ interface Topping extends ToppingType {
 interface ToppingPosition {
   x: number;
   y: number;
+  rotation?: number;
 }
 
 const sizePrices: Record<string, number> = {
@@ -142,8 +143,9 @@ export default function PizzaBuilder() {
     if (renderType === 'layer') return [];
     
     const positions = [];
-    const toppingCount = 8;
+    const toppingCount = 15;
     const radius = 0.35;
+    const minRadius = 0.1;
 
     const isInsideCircle = (x: number, y: number) => {
       const relX = x - 0.5;
@@ -156,18 +158,37 @@ export default function PizzaBuilder() {
       let attempts = 0;
       do {
         if (side === 'full') {
+          const ring = Math.random() < 0.7 ? 'outer' : 'inner';
           const angle = Math.random() * 2 * Math.PI;
-          const r = Math.sqrt(Math.random()) * radius;
+          
+          const r = ring === 'outer' 
+            ? (0.25 + Math.random() * (radius - 0.25))
+            : (minRadius + Math.random() * 0.15);
+          
           x = 0.5 + r * Math.cos(angle);
           y = 0.5 + r * Math.sin(angle);
         } else if (side === 'left') {
-          const angle = Math.random() * Math.PI + Math.PI/2;
-          const r = Math.sqrt(Math.random()) * radius;
+          const ring = Math.random() < 0.7 ? 'outer' : 'inner';
+          const baseAngle = Math.PI;
+          const angleSpread = Math.PI;
+          const angle = baseAngle + (Math.random() - 0.5) * angleSpread;
+          
+          const r = ring === 'outer'
+            ? (0.25 + Math.random() * (radius - 0.25))
+            : (minRadius + Math.random() * 0.15);
+          
           x = 0.5 + r * Math.cos(angle);
           y = 0.5 + r * Math.sin(angle);
         } else { // right
-          const angle = Math.random() * Math.PI - Math.PI/2;
-          const r = Math.sqrt(Math.random()) * radius;
+          const ring = Math.random() < 0.7 ? 'outer' : 'inner';
+          const baseAngle = 0;
+          const angleSpread = Math.PI;
+          const angle = baseAngle + (Math.random() - 0.5) * angleSpread;
+          
+          const r = ring === 'outer'
+            ? (0.25 + Math.random() * (radius - 0.25))
+            : (minRadius + Math.random() * 0.15);
+          
           x = 0.5 + r * Math.cos(angle);
           y = 0.5 + r * Math.sin(angle);
         }
@@ -177,11 +198,27 @@ export default function PizzaBuilder() {
       return { x, y };
     };
 
-    for (let i = 0; i < toppingCount; i++) {
-      positions.push(generateValidPosition(placement));
-    }
+    const addRandomRotation = (position: ToppingPosition): ToppingPosition => {
+      return {
+        ...position,
+        rotation: Math.random() * 360
+      };
+    };
 
-    return positions;
+    const generatePositions = () => {
+      const positions = [];
+      const outerCount = Math.floor(toppingCount * 0.7);
+      for (let i = 0; i < outerCount; i++) {
+        positions.push(generateValidPosition(placement));
+      }
+      const innerCount = toppingCount - outerCount;
+      for (let i = 0; i < innerCount; i++) {
+        positions.push(generateValidPosition(placement));
+      }
+      return positions;
+    };
+
+    return generatePositions().map(addRandomRotation);
   }, []);
 
   const handleClear = () => {
@@ -233,7 +270,7 @@ export default function PizzaBuilder() {
         style={{
           left: `${position.x * 100}%`,
           top: `${position.y * 100}%`,
-          transform: 'translate(-50%, -50%)',
+          transform: `translate(-50%, -50%) rotate(${position.rotation}deg)`,
           zIndex: topping.zIndex,
           backgroundColor: 'transparent',
           mixBlendMode: 'multiply',
