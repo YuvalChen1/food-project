@@ -142,7 +142,6 @@ export default function PizzaBuilder() {
   const generateToppingPositions = useCallback((placement: string, renderType: 'scattered' | 'layer'): ToppingPosition[] => {
     if (renderType === 'layer') return [];
     
-    const positions = [];
     const toppingCount = 15;
     const radius = 0.35;
     const minRadius = 0.1;
