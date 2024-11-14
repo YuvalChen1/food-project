@@ -91,13 +91,23 @@ export default function PizzaBuilder() {
     if (!selectedTopping || !pizzaRef.current) return;
     
     if (selectedTopping.name === 'Extra cheese') {
+      const existingCheeseIndex = pizzaToppings.findIndex(t => t.name === 'Extra cheese');
+      if (existingCheeseIndex !== -1) {
+        const updatedToppings = [...pizzaToppings];
+        updatedToppings[existingCheeseIndex] = {
+          ...selectedTopping,
+          placement: toppingPlacement,
+        };
+        setPizzaToppings(updatedToppings);
+      } else {
+        const newTopping: Topping = {
+          ...selectedTopping,
+          placement: toppingPlacement,
+        };
+        setPizzaToppings([...pizzaToppings, newTopping]);
+      }
       setHasExtraCheese(true);
       setCheesePlacement(toppingPlacement);
-      const newTopping: Topping = {
-        ...selectedTopping,
-        placement: toppingPlacement,
-      };
-      setPizzaToppings([...pizzaToppings, newTopping]);
       setSelectedTopping(null);
       return;
     }
@@ -260,7 +270,7 @@ export default function PizzaBuilder() {
 
     return topping.positions?.map((position, i) => (
       <Image
-        key={`${topping.id}-${i}`}
+        key={`${topping.id}-${i}-${Math.random()}`}
         src={topping.image}
         alt={topping.name}
         width={40}
@@ -320,7 +330,8 @@ export default function PizzaBuilder() {
                     src="/pizza-base.png"
                     alt="Pizza base"
                     fill
-                    className="object-contain"
+                    className="object-cover"
+                    priority
                   />
                   {hasExtraCheese && (
                     <div 
@@ -330,14 +341,21 @@ export default function PizzaBuilder() {
                           ? 'polygon(0 0, 50% 0, 50% 100%, 0 100%)'
                           : cheesePlacement === 'right'
                           ? 'polygon(50% 0, 100% 0, 100% 100%, 50% 100%)'
-                          : 'none'
+                          : 'none',
+                        transform: 'scale(1.03)',
+                        transformOrigin: 'center center'
                       }}
                     >
                       <Image
                         src="/pizza-cheese.png"
                         alt="Extra cheese"
                         fill
-                        className="object-contain"
+                        className="object-cover"
+                        style={{
+                          transform: 'scale(1)',
+                          transformOrigin: 'center center'
+                        }}
+                        priority
                       />
                     </div>
                   )}
