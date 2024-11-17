@@ -11,13 +11,15 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
   const router = useRouter();
 
   useEffect(() => {
-    return onAuthStateChanged(auth, (user) => {
-      if (!user) {
-        router.push('/staff/login');
-      } else {
-        setIsLoading(false);
-      }
-    });
+    if (typeof window !== 'undefined') {
+      return onAuthStateChanged(auth, (user) => {
+        if (!user) {
+          router.push('/staff/login');
+        } else {
+          setIsLoading(false);
+        }
+      });
+    }
   }, [router]);
 
   if (isLoading) {

@@ -1,6 +1,6 @@
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { getAuth, Auth } from 'firebase/auth';
+import { getFirestore, Firestore } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -11,19 +11,24 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-let app: FirebaseApp;
+// Initialize dummy services for SSR
+const dummyApp = {} as FirebaseApp;
+const dummyAuth = {} as Auth;
+const dummyDb = {} as Firestore;
 
-if (!getApps().length) {
-  try {
+let app: FirebaseApp = dummyApp;
+let auth: Auth = dummyAuth;
+let db: Firestore = dummyDb;
+
+// Only initialize Firebase on the client side
+if (typeof window !== 'undefined') {
+  if (!getApps().length) {
     app = initializeApp(firebaseConfig);
-  } catch (error) {
-    console.error('Error initializing Firebase:', error);
-    // Provide a dummy app for SSR
-    app = {} as FirebaseApp;
+  } else {
+    app = getApps()[0];
   }
-} else {
-  app = getApps()[0];
+  auth = getAuth(app);
+  db = getFirestore(app);
 }
 
-export const auth = getAuth(app);
-export const db = getFirestore(app);
+export { auth, db };
