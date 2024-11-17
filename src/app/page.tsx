@@ -6,6 +6,15 @@ import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { UtensilsCrossed, X, Trash2 } from 'lucide-react'
 import { toppings, ToppingType } from '@/data/toppings'
+import Swal from 'sweetalert2';
+import { addDoc, collection } from 'firebase/firestore'
+import { db } from '@/firebase/config'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 
 interface Topping extends ToppingType {
   x?: number;
@@ -26,6 +35,16 @@ const sizePrices: Record<string, number> = {
   l: 12,
 }
 
+interface OrderData {
+  size: string;
+  toppings: any[];
+  totalPrice: number;
+  timestamp: Date;
+  status: 'pending';
+  customerName: string;
+  phoneNumber: string;
+}
+
 export default function PizzaBuilder() {
   const [pizzaSize, setPizzaSize] = useState<string>("m")
   const [pizzaToppings, setPizzaToppings] = useState<Topping[]>([])
@@ -36,6 +55,10 @@ export default function PizzaBuilder() {
   // const draggedToppingRef = useRef<HTMLDivElement>(null)
   const [hasExtraCheese, setHasExtraCheese] = useState(false)
   const [cheesePlacement, setCheesePlacement] = useState<string>('full');
+  const [isLoading, setIsLoading] = useState(false);
+  const [customerName, setCustomerName] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [showContactModal, setShowContactModal] = useState(false);
 
   useEffect(() => {
     const preventDefault = (e: Event) => e.preventDefault()
@@ -185,15 +208,68 @@ export default function PizzaBuilder() {
     return (basePrice + toppingsPrice).toFixed(2)
   }
 
-  const handleCompleteOrder = () => {
-    const total = calculateTotal()
-    alert(`Order Summary:
-    Size: ${pizzaSize.toUpperCase()}
-    Toppings: ${pizzaToppings.map(t => `${t.name} (${t.placement})`).join(', ')}
-    Total: $${total}
-    
-    Thank you for your order!`)
-  }
+  const handleOrderClick = () => {
+    setShowContactModal(true);
+  };
+
+  const handleCompleteOrder = async () => {
+    try {
+      setIsLoading(true);
+
+      // Validate contact details
+      if (!customerName.trim() || !phoneNumber.trim()) {
+        await Swal.fire({
+          title: 'Missing Information',
+          text: 'Please provide your name and phone number',
+          icon: 'error',
+          confirmButtonColor: '#d33',
+        });
+        return;
+      }
+
+      const orderData: OrderData = {
+        size: pizzaSize.toUpperCase(),
+        toppings: pizzaToppings.map(t => ({
+          name: t.name,
+          placement: t.placement,
+          price: t.price
+        })),
+        totalPrice: parseFloat(calculateTotal()),
+        timestamp: new Date(),
+        status: 'pending',
+        customerName: customerName.trim(),
+        phoneNumber: phoneNumber.trim()
+      };
+
+      await addDoc(collection(db, 'orders'), orderData);
+      setShowContactModal(false);
+
+      await Swal.fire({
+        title: 'Success!',
+        text: 'Your order has been placed successfully. You will receive updates via SMS.',
+        icon: 'success',
+        confirmButtonColor: '#3085d6'
+      });
+
+      // Clear form
+      setPizzaToppings([]);
+      setHasExtraCheese(false);
+      setPizzaSize('m');
+      setCustomerName('');
+      setPhoneNumber('');
+
+    } catch (error) {
+      console.error('Error adding order:', error);
+      await Swal.fire({
+        title: 'Error',
+        text: 'Failed to place order. Please try again.',
+        icon: 'error',
+        confirmButtonColor: '#d33'
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const renderTopping = (topping: Topping) => {
     if (topping.renderType === 'layer') {
@@ -452,7 +528,11 @@ export default function PizzaBuilder() {
             </ScrollArea>
 
             <div className="flex justify-center mt-4">
-              <Button onClick={handleCompleteOrder} variant="default">
+              <Button 
+                onClick={handleOrderClick} 
+                variant="default"
+                className="relative"
+              >
                 Complete Order (${calculateTotal()})
               </Button>
             </div>
@@ -472,12 +552,63 @@ export default function PizzaBuilder() {
           </ScrollArea>
 
           <div className="flex justify-center mt-4">
-            <Button onClick={handleCompleteOrder} variant="default">
+            <Button 
+              onClick={handleOrderClick} 
+              variant="default"
+              className="relative"
+            >
               Complete Order (${calculateTotal()})
             </Button>
           </div>
         </div>
       </main>
+
+      <Dialog open={showContactModal} onOpenChange={setShowContactModal}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Complete Your Order</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Your Name</label>
+              <input
+                type="text"
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                className="w-full p-2 border rounded-md"
+                placeholder="Enter your name"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Phone Number</label>
+              <input
+                type="tel"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                className="w-full p-2 border rounded-md"
+                placeholder="Enter your phone number"
+                required
+              />
+            </div>
+            <div className="flex justify-end space-x-2 pt-4">
+              <Button variant="outline" onClick={() => setShowContactModal(false)}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleCompleteOrder}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  'Confirm Order'
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
