@@ -4,7 +4,7 @@ import React, { useState, useRef, useCallback, useEffect } from 'react'
 import Image from 'next/image'
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { UtensilsCrossed, X } from 'lucide-react'
+import { UtensilsCrossed, X, Trash2 } from 'lucide-react'
 import { toppings, ToppingType } from '@/data/toppings'
 
 interface Topping extends ToppingType {
@@ -49,104 +49,48 @@ export default function PizzaBuilder() {
     }
   }, [])
 
-  const handleDragStart = (e: React.DragEvent, topping: Topping) => {
-    e.dataTransfer.setData("topping", JSON.stringify(topping))
-    setSelectedTopping(topping)
-  }
-
-  const handleTouchStart = (e: React.TouchEvent, topping: Topping) => {
-    setSelectedTopping(topping)
-    setIsDragging(true)
-    const touch = e.touches[0]
-    if (draggedToppingRef.current) {
-      draggedToppingRef.current.style.left = `${touch.clientX - 32}px`
-      draggedToppingRef.current.style.top = `${touch.clientY - 32}px`
-    }
-  }
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (!isDragging || !draggedToppingRef.current) return
-    const touch = e.touches[0]
-    draggedToppingRef.current.style.left = `${touch.clientX - 32}px`
-    draggedToppingRef.current.style.top = `${touch.clientY - 32}px`
-  }
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (!isDragging || !selectedTopping) return
-    const touch = e.changedTouches[0]
-    addToppingToPizza(touch.clientX, touch.clientY)
-    setIsDragging(false)
-  }
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault()
-  }
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault()
-    addToppingToPizza(e.clientX, e.clientY)
-  }
-
-  const addToppingToPizza = (clientX: number, clientY: number) => {
-    if (!selectedTopping || !pizzaRef.current) return;
+  const handleToppingClick = (topping: Topping) => {
+    if (!pizzaRef.current) return;
     
-    if (selectedTopping.name === 'Extra cheese') {
+    if (topping.name === 'Extra cheese') {
       const existingCheeseIndex = pizzaToppings.findIndex(t => t.name === 'Extra cheese');
       if (existingCheeseIndex !== -1) {
         const updatedToppings = [...pizzaToppings];
         updatedToppings[existingCheeseIndex] = {
-          ...selectedTopping,
+          ...topping,
           placement: toppingPlacement,
         };
         setPizzaToppings(updatedToppings);
       } else {
         const newTopping: Topping = {
-          ...selectedTopping,
+          ...topping,
           placement: toppingPlacement,
         };
         setPizzaToppings([...pizzaToppings, newTopping]);
       }
       setHasExtraCheese(true);
       setCheesePlacement(toppingPlacement);
-      setSelectedTopping(null);
       return;
     }
+
+    const existingToppingIndex = pizzaToppings.findIndex(t => t.name === topping.name);
     
-    const pizzaRect = pizzaRef.current.getBoundingClientRect();
-    const x = (clientX - pizzaRect.left) / pizzaRect.width;
-    const y = (clientY - pizzaRect.top) / pizzaRect.height;
-
-    const relX = x - 0.5;
-    const relY = y - 0.5;
-    if (Math.sqrt(relX * relX + relY * relY) > 0.5) {
-      setSelectedTopping(null);
-      return;
-    }
-
-    const existingToppingIndex = pizzaToppings.findIndex(t => t.name === selectedTopping.name);
-
     if (existingToppingIndex !== -1) {
       const updatedToppings = [...pizzaToppings];
       updatedToppings[existingToppingIndex] = {
-        ...selectedTopping,
-        x,
-        y,
+        ...topping,
         placement: toppingPlacement,
-        positions: generateToppingPositions(toppingPlacement, selectedTopping.renderType),
+        positions: generateToppingPositions(toppingPlacement, topping.renderType),
       };
       setPizzaToppings(updatedToppings);
     } else {
       const newTopping: Topping = {
-        ...selectedTopping,
-        x,
-        y,
+        ...topping,
         placement: toppingPlacement,
-        positions: generateToppingPositions(toppingPlacement, selectedTopping.renderType),
+        positions: generateToppingPositions(toppingPlacement, topping.renderType),
       };
       setPizzaToppings([...pizzaToppings, newTopping]);
     }
-
-    setSelectedTopping(null);
   };
 
   const generateToppingPositions = useCallback((placement: string, renderType: 'scattered' | 'layer'): ToppingPosition[] => {
@@ -309,58 +253,80 @@ export default function PizzaBuilder() {
         </div>
       </header>
 
-      <main className="flex-1 container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold mb-8 text-center">Build Your Perfect Pizza</h1>
+      <main className="flex-1 container mx-auto px-4 py-4">
+        <h1 className="text-3xl font-bold mb-4 text-center">Build Your Perfect Pizza</h1>
 
         <div className="flex flex-col lg:flex-row gap-8 mb-8">
           <div className="flex-1 flex flex-col items-center">
-            <div className="w-full max-w-md aspect-square relative">
-              <div 
-                ref={pizzaRef}
-                className={`absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 rounded-full transition-all duration-300 overflow-hidden ${
-                  pizzaSize === 's' ? 'w-3/4 h-3/4' : pizzaSize === 'm' ? 'w-5/6 h-5/6' : 'w-full h-full'
-                }`}
-                onDragOver={handleDragOver}
-                onDrop={handleDrop}
-                onTouchMove={handleTouchMove}
-                onTouchEnd={handleTouchEnd}
-              >
-                <div className="relative w-full h-full">
-                  <Image
-                    src="/pizza-base.png"
-                    alt="Pizza base"
-                    fill
-                    className="object-cover"
-                    priority
+            <div className="relative w-full max-w-md">
+              {pizzaToppings.length > 0 && (
+                <Button
+                  onClick={handleClear}
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-[-30px] top-[25%] -translate-y-1/2 hover:bg-red-100 hover:text-red-600 transition-colors w-20 h-20 z-10 !p-0"
+                  title="Clear all toppings"
+                  style={{
+                    minWidth: 'unset',
+                    minHeight: 'unset'
+                  }}
+                >
+                  <Trash2 
+                    strokeWidth={2}
+                    className="w-full h-full"
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      padding: '1.6rem'
+                    }}
                   />
-                  {hasExtraCheese && (
-                    <div 
-                      className="absolute inset-0 overflow-hidden"
-                      style={{
-                        clipPath: cheesePlacement === 'left' 
-                          ? 'polygon(0 0, 50% 0, 50% 100%, 0 100%)'
-                          : cheesePlacement === 'right'
-                          ? 'polygon(50% 0, 100% 0, 100% 100%, 50% 100%)'
-                          : 'none',
-                        transform: 'scale(1.03)',
-                        transformOrigin: 'center center'
-                      }}
-                    >
-                      <Image
-                        src="/pizza-cheese.png"
-                        alt="Extra cheese"
-                        fill
-                        className="object-cover"
+                </Button>
+              )}
+              
+              <div className="aspect-square relative">
+                <div 
+                  ref={pizzaRef}
+                  className={`absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 rounded-full transition-all duration-300 overflow-hidden ${
+                    pizzaSize === 's' ? 'w-3/4 h-3/4' : pizzaSize === 'm' ? 'w-5/6 h-5/6' : 'w-full h-full'
+                  }`}
+                >
+                  <div className="relative w-full h-full">
+                    <Image
+                      src="/pizza-base.png"
+                      alt="Pizza base"
+                      fill
+                      className="object-cover"
+                      priority
+                    />
+                    {hasExtraCheese && (
+                      <div 
+                        className="absolute inset-0 overflow-hidden"
                         style={{
-                          transform: 'scale(1)',
+                          clipPath: cheesePlacement === 'left' 
+                            ? 'polygon(0 0, 50% 0, 50% 100%, 0 100%)'
+                            : cheesePlacement === 'right'
+                            ? 'polygon(50% 0, 100% 0, 100% 100%, 50% 100%)'
+                            : 'none',
+                          transform: 'scale(1.03)',
                           transformOrigin: 'center center'
                         }}
-                        priority
-                      />
-                    </div>
-                  )}
+                      >
+                        <Image
+                          src="/pizza-cheese.png"
+                          alt="Extra cheese"
+                          fill
+                          className="object-cover"
+                          style={{
+                            transform: 'scale(1)',
+                            transformOrigin: 'center center'
+                          }}
+                          priority
+                        />
+                      </div>
+                    )}
+                  </div>
+                  {pizzaToppings.map((topping) => renderTopping(topping))}
                 </div>
-                {pizzaToppings.map((topping) => renderTopping(topping))}
               </div>
             </div>
 
@@ -409,7 +375,7 @@ export default function PizzaBuilder() {
                   >
                     {/* Metal bowl container */}
                     <div 
-                      className="relative w-full aspect-square rounded-full max-w-[80px] lg:max-w-[85px] mx-auto"
+                      className="relative w-full aspect-square rounded-full min-w-[50px] max-w-[80px] lg:max-w-[85px] mx-auto"
                       style={{
                         background: 'linear-gradient(145deg, #c8c8c8, #e6e6e6)',
                         boxShadow: `
@@ -431,10 +397,8 @@ export default function PizzaBuilder() {
                       
                       {/* Topping container */}
                       <div 
-                        className="absolute inset-0 flex items-center justify-center cursor-move"
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, topping)}
-                        onTouchStart={(e) => handleTouchStart(e, topping)}
+                        className="absolute inset-0 flex items-center justify-center cursor-pointer"
+                        onClick={() => handleToppingClick(topping)}
                       >
                         <div className="w-3/4 h-3/4 relative">
                           <Image 
@@ -487,10 +451,7 @@ export default function PizzaBuilder() {
               ))}
             </ScrollArea>
 
-            <div className="flex justify-between mt-4 space-x-4">
-              <Button onClick={handleClear} variant="destructive">
-                Clear Toppings
-              </Button>
+            <div className="flex justify-center mt-4">
               <Button onClick={handleCompleteOrder} variant="default">
                 Complete Order (${calculateTotal()})
               </Button>
@@ -501,43 +462,22 @@ export default function PizzaBuilder() {
         <div className="flex-1 lg:hidden">
           <ScrollArea className="h-32 border rounded-md p-2">
             {pizzaToppings.map((topping) => (
-              <div key={topping.id} className="flex justify-between items-center mb-2">
-                <span>{topping.name} ({topping.placement})</span>
-                <Button variant="ghost" size="sm" onClick={() => topping.id !== undefined && removeTopping(topping.id)}>
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
+                <div key={topping.id} className="flex justify-between items-center mb-2">
+                  <span>{topping.name} ({topping.placement})</span>
+                  <Button variant="ghost" size="sm" onClick={() => topping.id !== undefined && removeTopping(topping.id)}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
             ))}
           </ScrollArea>
 
-          <div className="flex justify-between mt-4">
-            <Button onClick={handleClear} variant="destructive">
-              Clear Toppings
-            </Button>
+          <div className="flex justify-center mt-4">
             <Button onClick={handleCompleteOrder} variant="default">
               Complete Order (${calculateTotal()})
             </Button>
           </div>
         </div>
       </main>
-      {isDragging && selectedTopping && (
-        <div
-          ref={draggedToppingRef}
-          className="fixed pointer-events-none z-50"
-        >
-          <Image
-            src={selectedTopping.image}
-            alt={selectedTopping.name}
-            width={64}
-            height={64}
-            className="w-16 h-16 object-contain select-none"
-            style={{ 
-              backgroundColor: 'transparent',
-              mixBlendMode: 'multiply'
-            }}
-          />
-        </div>
-      )}
     </div>
   )
 }
