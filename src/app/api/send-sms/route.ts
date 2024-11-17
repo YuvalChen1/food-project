@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server';
 import twilio from 'twilio';
 
-// Initialize Twilio client
+// Check if required environment variables are set
+if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN || !process.env.TWILIO_PHONE_NUMBER) {
+  throw new Error('Missing required Twilio environment variables');
+}
+
+// Initialize Twilio client with type checking
 const client = twilio(
   process.env.TWILIO_ACCOUNT_SID,
   process.env.TWILIO_AUTH_TOKEN
