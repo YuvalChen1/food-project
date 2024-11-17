@@ -312,9 +312,9 @@ export default function PizzaBuilder() {
       <main className="flex-1 container mx-auto px-4 py-8">
         <h1 className="text-3xl font-bold mb-8 text-center">Build Your Perfect Pizza</h1>
 
-        <div className="flex flex-col lg:flex-row gap-8">
-          <div className="flex-1 order-1">
-            <div className="w-full max-w-md mx-auto aspect-square relative">
+        <div className="flex flex-col lg:flex-row gap-8 mb-8">
+          <div className="flex-1 flex flex-col items-center">
+            <div className="w-full max-w-md aspect-square relative">
               <div 
                 ref={pizzaRef}
                 className={`absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 rounded-full transition-all duration-300 overflow-hidden ${
@@ -396,61 +396,127 @@ export default function PizzaBuilder() {
                 Right Half
               </Button>
             </div>
+          </div>
 
-            <div className="mt-4 space-y-4">
-              <ScrollArea className="h-32 border rounded-md p-2">
-                {pizzaToppings.map((topping) => (
-                  <div key={topping.id} className="flex justify-between items-center mb-2">
-                    <span>{topping.name} ({topping.placement})</span>
-                    <Button variant="ghost" size="sm" onClick={() => topping.id !== undefined && removeTopping(topping.id)}>
-                      <X className="h-4 w-4" />
-                    </Button>
+          <div className="flex-1">
+            <div className="lg:mt-[30px]">
+              <h2 className="text-2xl font-bold mb-4 text-center lg:text-center">Toppings</h2>
+              <div className="grid grid-cols-5 lg:grid-cols-2 xl:grid-cols-3 gap-2 sm:gap-4">
+                {toppings.map((topping) => (
+                  <div
+                    key={topping.name}
+                    className="relative p-2 transform transition-transform hover:scale-105"
+                  >
+                    {/* Metal bowl container */}
+                    <div 
+                      className="relative w-full aspect-square rounded-full max-w-[80px] lg:max-w-[85px] mx-auto"
+                      style={{
+                        background: 'linear-gradient(145deg, #c8c8c8, #e6e6e6)',
+                        boxShadow: `
+                          inset 0 4px 8px rgba(0,0,0,0.3),
+                          inset 0 -2px 4px rgba(255,255,255,0.4),
+                          0 2px 4px rgba(0,0,0,0.2)
+                        `,
+                        transform: 'perspective(500px) rotateX(10deg)'
+                      }}
+                    >
+                      {/* Inner bowl shadow/highlight */}
+                      <div 
+                        className="absolute inset-[2px] rounded-full pointer-events-none"
+                        style={{
+                          background: 'linear-gradient(135deg, rgba(255,255,255,0.4) 0%, transparent 50%, rgba(0,0,0,0.2) 100%)',
+                          border: '1px solid rgba(255,255,255,0.2)'
+                        }}
+                      />
+                      
+                      {/* Topping container */}
+                      <div 
+                        className="absolute inset-0 flex items-center justify-center cursor-move"
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, topping)}
+                        onTouchStart={(e) => handleTouchStart(e, topping)}
+                      >
+                        <div className="w-3/4 h-3/4 relative">
+                          <Image 
+                            src={topping.image} 
+                            alt={topping.name} 
+                            width={40}
+                            height={40}
+                            className="w-full h-full object-contain select-none"
+                            style={{ 
+                              backgroundColor: 'transparent',
+                              mixBlendMode: 'multiply',
+                              filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.2))'
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Rim highlight */}
+                      <div 
+                        className="absolute inset-0 rounded-full pointer-events-none"
+                        style={{
+                          background: 'linear-gradient(45deg, rgba(255,255,255,0.2) 0%, transparent 70%)',
+                          border: '1px solid rgba(255,255,255,0.3)'
+                        }}
+                      />
+                    </div>
+
+                    {/* Labels */}
+                    <div className="mt-2 text-center">
+                      <p className="text-[11px] sm:text-xs font-medium text-gray-700">{topping.name}</p>
+                      <p className="text-[10px] sm:text-xs text-gray-500">${topping.price.toFixed(2)}</p>
+                    </div>
                   </div>
                 ))}
-              </ScrollArea>
-
-              <div className="flex justify-between">
-                <Button onClick={handleClear} variant="destructive">
-                  Clear Toppings
-                </Button>
-                <Button onClick={handleCompleteOrder} variant="default">
-                  Complete Order (${calculateTotal()})
-                </Button>
               </div>
             </div>
           </div>
+        </div>
 
-          <div className="flex-1 order-2 lg:mt-0 mt-8">
-            <h2 className="text-2xl font-bold mb-4 text-center lg:text-center">Toppings</h2>
-            <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-              {toppings.map((topping) => (
-                <div
-                  key={topping.name}
-                  className="bg-white p-2 rounded shadow"
-                >
-                  <div 
-                    className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-2 relative cursor-move touch-none"
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, topping)}
-                    onTouchStart={(e) => handleTouchStart(e, topping)}
-                  >
-                    <Image 
-                      src={topping.image} 
-                      alt={topping.name} 
-                      width={64}
-                      height={64}
-                      className="w-full h-full object-contain select-none"
-                      style={{ 
-                        backgroundColor: 'transparent',
-                        mixBlendMode: 'multiply'
-                      }}
-                    />
-                  </div>
-                  <p className="text-center text-xs sm:text-sm">{topping.name}</p>
-                  <p className="text-center text-xs sm:text-sm text-gray-500">${topping.price.toFixed(2)}</p>
+        <div className="hidden lg:flex flex-col items-center">
+          <div className="w-[300px]">
+            <ScrollArea className="h-32 border rounded-md p-2">
+              {pizzaToppings.map((topping) => (
+                <div key={topping.id} className="flex justify-between items-center mb-2">
+                  <span>{topping.name} ({topping.placement})</span>
+                  <Button variant="ghost" size="sm" onClick={() => topping.id !== undefined && removeTopping(topping.id)}>
+                    <X className="h-4 w-4" />
+                  </Button>
                 </div>
               ))}
+            </ScrollArea>
+
+            <div className="flex justify-between mt-4 space-x-4">
+              <Button onClick={handleClear} variant="destructive">
+                Clear Toppings
+              </Button>
+              <Button onClick={handleCompleteOrder} variant="default">
+                Complete Order (${calculateTotal()})
+              </Button>
             </div>
+          </div>
+        </div>
+
+        <div className="flex-1 lg:hidden">
+          <ScrollArea className="h-32 border rounded-md p-2">
+            {pizzaToppings.map((topping) => (
+              <div key={topping.id} className="flex justify-between items-center mb-2">
+                <span>{topping.name} ({topping.placement})</span>
+                <Button variant="ghost" size="sm" onClick={() => topping.id !== undefined && removeTopping(topping.id)}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+          </ScrollArea>
+
+          <div className="flex justify-between mt-4">
+            <Button onClick={handleClear} variant="destructive">
+              Clear Toppings
+            </Button>
+            <Button onClick={handleCompleteOrder} variant="default">
+              Complete Order (${calculateTotal()})
+            </Button>
           </div>
         </div>
       </main>
