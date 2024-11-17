@@ -5,10 +5,9 @@ import { useEffect, useState } from 'react';
 export default function FirebaseProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [debugInfo, setDebugInfo] = useState<any>(null);
 
   useEffect(() => {
-    // More detailed environment variable checking
+    // Check environment variables
     const envVars = {
       apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
       authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -18,29 +17,9 @@ export default function FirebaseProvider({ children }: { children: React.ReactNo
       appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
     };
 
-    // Save debug info
-    setDebugInfo({
-      hasEnvVars: {
-        apiKey: !!envVars.apiKey,
-        authDomain: !!envVars.authDomain,
-        projectId: !!envVars.projectId,
-        storageBucket: !!envVars.storageBucket,
-        messagingSenderId: !!envVars.messagingSenderId,
-        appId: !!envVars.appId
-      },
-      envVarValues: {
-        apiKey: envVars.apiKey ? `${envVars.apiKey.slice(0, 5)}...` : 'missing',
-        authDomain: envVars.authDomain || 'missing',
-        projectId: envVars.projectId || 'missing',
-        storageBucket: envVars.storageBucket || 'missing',
-        messagingSenderId: envVars.messagingSenderId || 'missing',
-        appId: envVars.appId ? `${envVars.appId.slice(0, 5)}...` : 'missing'
-      }
-    });
-
     // Check for missing required variables
     const missingVars = Object.entries(envVars)
-      .filter(([key, value]) => !value)
+      .filter(([_, value]) => !value)
       .map(([key]) => key);
 
     if (missingVars.length > 0) {
@@ -50,24 +29,13 @@ export default function FirebaseProvider({ children }: { children: React.ReactNo
     setIsLoading(false);
   }, []);
 
-  if (error || debugInfo) {
+  if (error) {
     return (
       <div className="flex min-h-screen items-center justify-center flex-col gap-4 p-4">
-        {error && (
-          <>
-            <div className="text-red-500 font-bold">Error: {error}</div>
-            <div className="text-sm text-gray-600">
-              Please check your environment variables in Vercel
-            </div>
-          </>
-        )}
-        {debugInfo && (
-          <div className="mt-4 p-4 bg-gray-100 rounded-lg text-sm">
-            <pre className="whitespace-pre-wrap">
-              {JSON.stringify(debugInfo, null, 2)}
-            </pre>
-          </div>
-        )}
+        <div className="text-red-500 font-bold">Error: {error}</div>
+        <div className="text-sm text-gray-600">
+          Please check your environment variables in Vercel
+        </div>
       </div>
     );
   }
@@ -80,5 +48,6 @@ export default function FirebaseProvider({ children }: { children: React.ReactNo
     );
   }
 
+  // All environment variables are present, render the app
   return <>{children}</>;
 }
