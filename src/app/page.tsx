@@ -29,11 +29,11 @@ const sizePrices: Record<string, number> = {
 export default function PizzaBuilder() {
   const [pizzaSize, setPizzaSize] = useState<string>("m")
   const [pizzaToppings, setPizzaToppings] = useState<Topping[]>([])
-  const [selectedTopping, setSelectedTopping] = useState<Topping | null>(null)
+  // const [selectedTopping, setSelectedTopping] = useState<Topping | null>(null)
   const [toppingPlacement, setToppingPlacement] = useState<string>("full")
-  const [isDragging, setIsDragging] = useState(false)
+  // const [isDragging, setIsDragging] = useState(false)
   const pizzaRef = useRef<HTMLDivElement>(null)
-  const draggedToppingRef = useRef<HTMLDivElement>(null)
+  // const draggedToppingRef = useRef<HTMLDivElement>(null)
   const [hasExtraCheese, setHasExtraCheese] = useState(false)
   const [cheesePlacement, setCheesePlacement] = useState<string>('full');
 
