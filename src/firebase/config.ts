@@ -1,6 +1,6 @@
-import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
-import { getAuth } from "firebase/auth";
+import { initializeApp, getApps } from 'firebase/app';
+import { getAuth } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -9,10 +9,13 @@ const firebaseConfig = {
   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
-const app = initializeApp(firebaseConfig);
+// Check if all required Firebase configuration values are present
+const isFirebaseConfigured = Object.values(firebaseConfig).every(value => value !== undefined);
 
-export const db = getFirestore(app);
+// Only initialize Firebase if it hasn't been initialized and all config values are present
+const app = !getApps().length && isFirebaseConfigured ? initializeApp(firebaseConfig) : getApps()[0];
+
 export const auth = getAuth(app);
+export const db = getFirestore(app);
