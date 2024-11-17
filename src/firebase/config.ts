@@ -1,4 +1,4 @@
-import { initializeApp, getApps } from 'firebase/app';
+import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
@@ -11,11 +11,19 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Check if all required Firebase configuration values are present
-const isFirebaseConfigured = Object.values(firebaseConfig).every(value => value !== undefined);
+let app: FirebaseApp;
 
-// Only initialize Firebase if it hasn't been initialized and all config values are present
-const app = !getApps().length && isFirebaseConfigured ? initializeApp(firebaseConfig) : getApps()[0];
+if (!getApps().length) {
+  try {
+    app = initializeApp(firebaseConfig);
+  } catch (error) {
+    console.error('Error initializing Firebase:', error);
+    // Provide a dummy app for SSR
+    app = {} as FirebaseApp;
+  }
+} else {
+  app = getApps()[0];
+}
 
 export const auth = getAuth(app);
 export const db = getFirestore(app);
