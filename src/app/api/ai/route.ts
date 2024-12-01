@@ -3,8 +3,11 @@ import OpenAI from 'openai';
 
 const toppings = [
   'Pepperoni', 'Mushrooms', 'Onions'
-  // Add other toppings as needed
 ];
+
+if (!process.env.OPENAI_API_KEY) {
+  throw new Error('OPENAI_API_KEY is not configured in environment variables');
+}
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
@@ -34,6 +37,10 @@ export async function POST(req: Request) {
     return NextResponse.json(response.choices[0].message.content);
   } catch (error) {
     console.error('Error processing AI order:', error);
-    return NextResponse.json({ error: 'Failed to process order' }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    return NextResponse.json(
+      { error: 'Failed to process order', details: errorMessage },
+      { status: 500 }
+    );
   }
 } 
