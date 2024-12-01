@@ -4,7 +4,7 @@ import React, { useState, useRef, useCallback, useEffect } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { UtensilsCrossed, X, Trash2 } from "lucide-react";
+import { UtensilsCrossed, X, Trash2, Mic, MicOff } from "lucide-react";
 import { toppings, ToppingType } from "@/data/toppings";
 import Swal from "sweetalert2";
 import { addDoc, collection } from "firebase/firestore";
@@ -14,7 +14,10 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
+import { processAIOrder } from '@/lib/aiOrderHandler';
+import { trackUnavailableToppingRequest } from '@/lib/orderAnalysis';
 
 interface Topping extends ToppingType {
   x?: number;
@@ -59,6 +62,10 @@ export default function PizzaBuilder() {
   const [customerName, setCustomerName] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [showContactModal, setShowContactModal] = useState(false);
+  const [showAIChat, setShowAIChat] = useState(false);
+  const [aiMessage, setAIMessage] = useState("");
+  const [isProcessingAI, setIsProcessingAI] = useState(false);
+  const [isListening, setIsListening] = useState(false);
 
   useEffect(() => {
     const preventDefault = (e: Event) => e.preventDefault();
@@ -351,6 +358,93 @@ export default function PizzaBuilder() {
       setHasExtraCheese(false);
     }
     setPizzaToppings(pizzaToppings.filter((t) => t.id !== toppingId));
+  };
+
+  const handleAIChat = async () => {
+    if (!aiMessage.trim()) return;
+
+    try {
+      setIsProcessingAI(true);
+      const orderDetails = await processAIOrder(aiMessage);
+      
+      // Set pizza size
+      setPizzaSize(orderDetails.size.toLowerCase());
+      
+      // Add toppings
+      const newToppings = orderDetails.toppings.map(toppingName => {
+        const topping = toppings.find(t => t.name.toLowerCase() === toppingName.toLowerCase());
+        if (!topping) {
+          trackUnavailableToppingRequest(toppingName);
+          return null;
+        }
+        return {
+          ...topping,
+          placement: orderDetails.placement || 'full',
+          positions: generateToppingPositions(orderDetails.placement || 'full', topping.renderType)
+        };
+      }).filter(t => t !== null);
+
+      setPizzaToppings(newToppings as Topping[]);
+      
+      if (orderDetails.customerName) {
+        setCustomerName(orderDetails.customerName);
+      }
+      if (orderDetails.phoneNumber) {
+        setPhoneNumber(orderDetails.phoneNumber);
+      }
+
+      setAIMessage("");
+      setShowAIChat(false);
+      
+      await Swal.fire({
+        title: "Success!",
+        text: "AI processed your order",
+        icon: "success",
+      });
+    } catch (error) {
+      console.error("Error processing AI chat:", error);
+      await Swal.fire({
+        title: "Error",
+        text: "Failed to process AI order",
+        icon: "error",
+      });
+    } finally {
+      setIsProcessingAI(false);
+    }
+  };
+
+  const startListening = () => {
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
+      const recognition = new SpeechRecognition();
+      
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+
+      recognition.onstart = () => {
+        setIsListening(true);
+      };
+
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
+        const transcript = event.results[0][0].transcript;
+        setAIMessage(transcript);
+        setIsListening(false);
+      };
+
+      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+        console.error('Speech recognition error:', event.error);
+        setIsListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognition.start();
+    } else {
+      alert('Speech recognition is not supported in this browser.');
+    }
   };
 
   return (
@@ -686,6 +780,63 @@ export default function PizzaBuilder() {
                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 ) : (
                   "Confirm Order"
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Button
+        onClick={() => setShowAIChat(true)}
+        className="fixed bottom-4 right-4 rounded-full bg-blue-500 hover:bg-blue-600 text-white"
+      >
+        🤖 Order with AI
+      </Button>
+
+      <Dialog open={showAIChat} onOpenChange={setShowAIChat}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Order with AI Assistant</DialogTitle>
+            <DialogDescription>
+              Describe your pizza order to our AI assistant
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="flex flex-col gap-4">
+              <div className="relative">
+                <textarea
+                  value={aiMessage}
+                  onChange={(e) => setAIMessage(e.target.value)}
+                  placeholder="Example: I want a large pizza with pepperoni on the left half and mushrooms on the right half"
+                  className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-2 bottom-2"
+                  onClick={startListening}
+                  disabled={isListening}
+                >
+                  {isListening ? (
+                    <MicOff className="h-4 w-4 text-red-500 animate-pulse" />
+                  ) : (
+                    <Mic className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+              <Button 
+                onClick={handleAIChat} 
+                disabled={isProcessingAI || !aiMessage.trim()}
+              >
+                {isProcessingAI ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Processing...
+                  </div>
+                ) : (
+                  "Send Order"
                 )}
               </Button>
             </div>
