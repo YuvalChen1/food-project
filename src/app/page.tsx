@@ -86,45 +86,36 @@ export default function PizzaBuilder() {
   const handleToppingClick = (topping: Topping) => {
     if (!pizzaRef.current) return;
 
+    // Handle Extra cheese separately
     if (topping.name === "Extra cheese") {
-      const existingCheeseIndex = pizzaToppings.findIndex(
-        (t) => t.name === "Extra cheese"
-      );
-      if (existingCheeseIndex !== -1) {
-        const updatedToppings = [...pizzaToppings];
-        updatedToppings[existingCheeseIndex] = {
-          ...topping,
-          placement: toppingPlacement,
-        };
-        setPizzaToppings(updatedToppings);
+      if (hasExtraCheese) {
+        // Remove cheese
+        setPizzaToppings(pizzaToppings.filter(t => t.name !== "Extra cheese"));
+        setHasExtraCheese(false);
       } else {
+        // Add cheese
         const newTopping: Topping = {
           ...topping,
           placement: toppingPlacement,
         };
         setPizzaToppings([...pizzaToppings, newTopping]);
+        setHasExtraCheese(true);
+        setCheesePlacement(toppingPlacement);
       }
-      setHasExtraCheese(true);
-      setCheesePlacement(toppingPlacement);
       return;
     }
 
+    // For other toppings
     const existingToppingIndex = pizzaToppings.findIndex(
-      (t) => t.name === topping.name
+      t => t.name === topping.name
     );
 
     if (existingToppingIndex !== -1) {
-      const updatedToppings = [...pizzaToppings];
-      updatedToppings[existingToppingIndex] = {
-        ...topping,
-        placement: toppingPlacement,
-        positions: generateToppingPositions(
-          toppingPlacement,
-          topping.renderType
-        ),
-      };
+      // Remove the topping if it exists
+      const updatedToppings = pizzaToppings.filter((_, index) => index !== existingToppingIndex);
       setPizzaToppings(updatedToppings);
     } else {
+      // Add the topping with new positions
       const newTopping: Topping = {
         ...topping,
         placement: toppingPlacement,
@@ -448,7 +439,7 @@ export default function PizzaBuilder() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-screen overflow-x-hidden">
       <header className="bg-black text-white px-4 lg:px-6 py-4 sm:py-6">
         <div className="container mx-auto flex items-center justify-between">
           <a className="flex items-center justify-center" href="#">
@@ -592,15 +583,20 @@ export default function PizzaBuilder() {
               <h2 className="text-2xl font-bold mb-4 text-center lg:text-center">
                 Toppings
               </h2>
-              <div className="grid grid-cols-5 lg:grid-cols-2 xl:grid-cols-3 gap-2 sm:gap-4">
+              <div className="grid grid-cols-4 sm:grid-cols-5 lg:grid-cols-2 xl:grid-cols-3 gap-2 sm:gap-4">
                 {toppings.map((topping) => (
                   <div
                     key={topping.name}
-                    className="relative p-2 transform transition-transform hover:scale-105"
+                    className={`relative p-2 sm:p-3 flex flex-col items-center transform transition-transform hover:scale-105 ${
+                      pizzaToppings.some(t => t.name === topping.name) ? 
+                      'ring-2 ring-blue-500 ring-offset-2 sm:ring-offset-4 rounded-full bg-blue-50' : ''
+                    }`}
                   >
                     {/* Metal bowl container */}
                     <div
-                      className="relative w-full aspect-square rounded-full min-w-[50px] max-w-[80px] lg:max-w-[85px] mx-auto"
+                      className={`relative w-[85%] aspect-square rounded-full min-w-[45px] sm:min-w-[50px] max-w-[70px] sm:max-w-[80px] lg:max-w-[85px] mx-auto ${
+                        pizzaToppings.some(t => t.name === topping.name) ? 'scale-95' : ''
+                      }`}
                       style={{
                         background: "linear-gradient(145deg, #c8c8c8, #e6e6e6)",
                         boxShadow: `
@@ -669,6 +665,8 @@ export default function PizzaBuilder() {
           </div>
         </div>
 
+        {/* Comment out the toppings list section */}
+        {/* 
         <div className="hidden lg:flex flex-col items-center">
           <div className="w-[300px]">
             <ScrollArea className="h-32 border rounded-md p-2">
@@ -692,19 +690,23 @@ export default function PizzaBuilder() {
                 </div>
               ))}
             </ScrollArea>
-
-            <div className="flex justify-center mt-4">
-              <Button
-                onClick={handleOrderClick}
-                variant="default"
-                className="relative"
-              >
-                Complete Order (${calculateTotal()})
-              </Button>
-            </div>
           </div>
         </div>
+        */}
 
+        {/* Add back the order button for desktop */}
+        <div className="hidden lg:flex justify-center mt-4">
+          <Button
+            onClick={handleOrderClick}
+            variant="default"
+            className="relative"
+          >
+            Complete Order (${calculateTotal()})
+          </Button>
+        </div>
+
+        {/* Comment out the mobile toppings list */}
+        {/* 
         <div className="flex-1 lg:hidden">
           <ScrollArea className="h-32 border rounded-md p-2">
             {pizzaToppings.map((topping) => (
@@ -737,6 +739,18 @@ export default function PizzaBuilder() {
               Complete Order (${calculateTotal()})
             </Button>
           </div>
+        </div>
+        */}
+
+        {/* Mobile order button */}
+        <div className="flex lg:hidden justify-center mb-20 mt-4">
+          <Button
+            onClick={handleOrderClick}
+            variant="default"
+            className="relative"
+          >
+            Complete Order (${calculateTotal()})
+          </Button>
         </div>
       </main>
 
@@ -789,7 +803,7 @@ export default function PizzaBuilder() {
 
       <Button
         onClick={() => setShowAIChat(true)}
-        className="fixed bottom-4 right-4 rounded-full bg-blue-500 hover:bg-blue-600 text-white"
+        className="fixed bottom-6 right-4 rounded-full bg-blue-500 hover:bg-blue-600 text-white z-50"
       >
         🤖 Order with AI
       </Button>
