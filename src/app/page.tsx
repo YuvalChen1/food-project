@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { processAIOrder } from '@/lib/aiOrderHandler';
 import { trackUnavailableToppingRequest } from '@/lib/orderAnalysis';
+import { translations, type Language } from '@/lib/translations';
 
 interface Topping extends ToppingType {
   x?: number;
@@ -66,6 +67,7 @@ export default function PizzaBuilder() {
   const [aiMessage, setAIMessage] = useState("");
   const [isProcessingAI, setIsProcessingAI] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [language, setLanguage] = useState<Language>('he');
 
   useEffect(() => {
     const preventDefault = (e: Event) => e.preventDefault();
@@ -232,7 +234,7 @@ export default function PizzaBuilder() {
       (total, topping) => total + topping.price,
       0
     );
-    return (basePrice + toppingsPrice).toFixed(2);
+    return Number((basePrice + toppingsPrice).toFixed(2));
   };
 
   const handleOrderClick = () => {
@@ -268,7 +270,7 @@ export default function PizzaBuilder() {
           placement: t.placement,
           price: t.price,
         })),
-        totalPrice: parseFloat(calculateTotal()),
+        totalPrice: calculateTotal(),
         timestamp: new Date(),
         status: "pending",
         customerName: customerName.trim(),
@@ -411,7 +413,7 @@ export default function PizzaBuilder() {
       
       recognition.continuous = false;
       recognition.interimResults = false;
-      recognition.lang = 'en-US';
+      recognition.lang = language === 'he' ? 'he-IL' : 'en-US';
 
       recognition.onstart = () => {
         setIsListening(true);
@@ -438,22 +440,54 @@ export default function PizzaBuilder() {
     }
   };
 
+  const getToppingTranslation = (name: string) => {
+    const key = name.toLowerCase()
+      .split(' ')
+      .map((word, index) => 
+        index === 0 ? word : word.charAt(0).toUpperCase() + word.slice(1)
+      )
+      .join('') as keyof typeof translations.en.toppingNames;
+    
+    return translations[language].toppingNames[key] || name;
+  };
+
+  // Helper function for price conversion
+  const formatPrice = (price: number) => {
+    const rate = translations[language].currency.rate;
+    const symbol = translations[language].currency.symbol;
+    return `${symbol}${(price * rate).toFixed(2)}`;
+  };
+
+  // Fix the order button price format
+  const formatOrderPrice = (price: number) => {
+    const formattedPrice = formatPrice(price);
+    return language === 'he' ? `(${formattedPrice})` : `(${formattedPrice})`;
+  };
+
   return (
-    <div className="flex flex-col min-h-screen overflow-x-hidden">
+    <div className={`flex flex-col min-h-screen overflow-x-hidden ${language === 'he' ? 'rtl' : 'ltr'}`}>
       <header className="bg-black text-white px-4 lg:px-6 py-4 sm:py-6">
         <div className="container mx-auto flex items-center justify-between">
           <a className="flex items-center justify-center" href="#">
             <UtensilsCrossed className="h-6 w-6 sm:h-8 sm:w-8" />
             <span className="ml-2 text-lg sm:text-xl md:text-2xl font-bold">
-              Pizza Paradise
+              {translations[language].title}
             </span>
           </a>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setLanguage(language === 'en' ? 'he' : 'en')}
+            className="text-white hover:text-white border-white hover:bg-white/10 bg-transparent"
+          >
+            {language === 'en' ? 'עברית' : 'English'}
+          </Button>
         </div>
       </header>
 
       <main className="flex-1 container mx-auto px-4 py-4">
-        <h1 className="text-3xl font-bold mb-4 text-center">
-          Build Your Perfect Pizza
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 mt-2 text-center whitespace-nowrap">
+          {translations[language].buildPizza}
         </h1>
 
         <div className="flex flex-col lg:flex-row gap-8 mb-8">
@@ -540,19 +574,19 @@ export default function PizzaBuilder() {
                 onClick={() => setPizzaSize("s")}
                 variant={pizzaSize === "s" ? "default" : "outline"}
               >
-                S
+                {translations[language].sizes.small}
               </Button>
               <Button
                 onClick={() => setPizzaSize("m")}
                 variant={pizzaSize === "m" ? "default" : "outline"}
               >
-                M
+                {translations[language].sizes.medium}
               </Button>
               <Button
                 onClick={() => setPizzaSize("l")}
                 variant={pizzaSize === "l" ? "default" : "outline"}
               >
-                L
+                {translations[language].sizes.large}
               </Button>
             </div>
 
@@ -561,19 +595,19 @@ export default function PizzaBuilder() {
                 onClick={() => setToppingPlacement("full")}
                 variant={toppingPlacement === "full" ? "default" : "outline"}
               >
-                Full
+                {translations[language].placement.full}
               </Button>
               <Button
                 onClick={() => setToppingPlacement("left")}
                 variant={toppingPlacement === "left" ? "default" : "outline"}
               >
-                Left Half
+                {translations[language].placement.leftHalf}
               </Button>
               <Button
                 onClick={() => setToppingPlacement("right")}
                 variant={toppingPlacement === "right" ? "default" : "outline"}
               >
-                Right Half
+                {translations[language].placement.rightHalf}
               </Button>
             </div>
           </div>
@@ -581,7 +615,7 @@ export default function PizzaBuilder() {
           <div className="flex-1">
             <div className="lg:mt-[30px]">
               <h2 className="text-2xl font-bold mb-4 text-center lg:text-center">
-                Toppings
+                {translations[language].toppings}
               </h2>
               <div className="grid grid-cols-4 sm:grid-cols-5 lg:grid-cols-2 xl:grid-cols-3 gap-2 sm:gap-4">
                 {toppings.map((topping) => (
@@ -652,10 +686,10 @@ export default function PizzaBuilder() {
                     {/* Labels */}
                     <div className="mt-2 text-center">
                       <p className="text-[11px] sm:text-xs font-medium text-gray-700">
-                        {topping.name}
+                        {getToppingTranslation(topping.name)}
                       </p>
                       <p className="text-[10px] sm:text-xs text-gray-500">
-                        ${topping.price.toFixed(2)}
+                        {formatPrice(topping.price)}
                       </p>
                     </div>
                   </div>
@@ -701,7 +735,10 @@ export default function PizzaBuilder() {
             variant="default"
             className="relative"
           >
-            Complete Order (${calculateTotal()})
+            {language === 'he' 
+              ? `${translations[language].order.complete} ${formatOrderPrice(calculateTotal())}`
+              : `${translations[language].order.complete} ${formatOrderPrice(calculateTotal())}`
+            }
           </Button>
         </div>
 
@@ -736,7 +773,7 @@ export default function PizzaBuilder() {
               variant="default"
               className="relative"
             >
-              Complete Order (${calculateTotal()})
+              {translations[language].order.complete} (${calculateTotal()})
             </Button>
           </div>
         </div>
@@ -749,51 +786,57 @@ export default function PizzaBuilder() {
             variant="default"
             className="relative"
           >
-            Complete Order (${calculateTotal()})
+            {language === 'he' 
+              ? `${translations[language].order.complete} ${formatOrderPrice(calculateTotal())}`
+              : `${translations[language].order.complete} ${formatOrderPrice(calculateTotal())}`
+            }
           </Button>
         </div>
       </main>
 
       <Dialog open={showContactModal} onOpenChange={setShowContactModal}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Complete Your Order</DialogTitle>
+        <DialogContent className={`sm:max-w-[425px] ${language === 'he' ? 'rtl text-right [&>button]:left-4 [&>button]:right-auto' : 'ltr text-left'}`}>
+          <DialogHeader className={`${language === 'he' ? 'ml-8' : 'mr-8'}`}>
+            <DialogTitle className={language === 'he' ? 'text-right' : 'text-left'}>
+              {translations[language].contact.title}
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Your Name</label>
+              <label className="text-sm font-medium">
+                {translations[language].contact.name}
+              </label>
               <input
                 type="text"
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
-                className="w-full p-2 border rounded-md"
-                placeholder="Enter your name"
+                className={`w-full p-2 border rounded-md ${language === 'he' ? 'text-right' : 'text-left'}`}
+                placeholder={translations[language].contact.namePlaceholder}
                 required
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Phone Number</label>
+              <label className="text-sm font-medium">
+                {translations[language].contact.phone}
+              </label>
               <input
                 type="tel"
                 value={phoneNumber}
                 onChange={(e) => setPhoneNumber(e.target.value)}
-                className="w-full p-2 border rounded-md"
-                placeholder="Enter your phone number"
+                className={`w-full p-2 border rounded-md ${language === 'he' ? 'text-right' : 'text-left'}`}
+                placeholder={translations[language].contact.phonePlaceholder}
                 required
               />
             </div>
-            <div className="flex justify-end space-x-2 pt-4">
-              <Button
-                variant="outline"
-                onClick={() => setShowContactModal(false)}
-              >
-                Cancel
+            <div className={`flex ${language === 'he' ? 'flex-row-reverse' : ''} justify-end space-x-2 pt-4`}>
+              <Button variant="outline" onClick={() => setShowContactModal(false)}>
+                {translations[language].order.cancel}
               </Button>
               <Button onClick={handleCompleteOrder} disabled={isLoading}>
                 {isLoading ? (
                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 ) : (
-                  "Confirm Order"
+                  translations[language].order.confirmOrder
                 )}
               </Button>
             </div>
@@ -805,16 +848,20 @@ export default function PizzaBuilder() {
         onClick={() => setShowAIChat(true)}
         className="fixed bottom-6 right-4 rounded-full bg-blue-500 hover:bg-blue-600 text-white z-50"
       >
-        🤖 Order with AI
+        {language === 'he' ? '🤖 AI הזמן עם ' : '🤖 Order with AI'}
       </Button>
 
       <Dialog open={showAIChat} onOpenChange={setShowAIChat}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Order with AI Assistant</DialogTitle>
-            <DialogDescription>
-              Describe your pizza order to our AI assistant
-            </DialogDescription>
+        <DialogContent className={`sm:max-w-[425px] ${language === 'he' ? 'rtl text-right' : 'ltr text-left'}`}>
+          <DialogHeader className={`${language === 'he' ? 'ml-8' : 'mr-8'}`}>
+            <DialogTitle 
+              className={language === 'he' ? 'text-right' : 'text-left'}
+              dangerouslySetInnerHTML={{ __html: translations[language].ai.title }}
+            />
+            <DialogDescription 
+              className={language === 'he' ? 'text-right' : 'text-left'}
+              dangerouslySetInnerHTML={{ __html: translations[language].ai.description }}
+            />
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="flex flex-col gap-4">
@@ -822,14 +869,16 @@ export default function PizzaBuilder() {
                 <textarea
                   value={aiMessage}
                   onChange={(e) => setAIMessage(e.target.value)}
-                  placeholder="Example: I want a large pizza with pepperoni on the left half and mushrooms on the right half"
-                  className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  placeholder={translations[language].ai.placeholder}
+                  className={`flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
+                    language === 'he' ? 'text-right' : 'text-left'
+                  }`}
                 />
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="absolute right-2 bottom-2"
+                  className={`absolute ${language === 'he' ? 'left-2' : 'right-2'} bottom-2`}
                   onClick={startListening}
                   disabled={isListening}
                 >
@@ -847,10 +896,10 @@ export default function PizzaBuilder() {
                 {isProcessingAI ? (
                   <div className="flex items-center gap-2">
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Processing...
+                    {translations[language].ai.processing}
                   </div>
                 ) : (
-                  "Send Order"
+                  translations[language].ai.send
                 )}
               </Button>
             </div>
