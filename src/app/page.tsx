@@ -387,6 +387,7 @@ export default function PizzaBuilder() {
             topping.name === "Onions" ? 0.8 :
             topping.name === "Mushrooms" ? 0.7 :
             topping.name === "Green peppers" ? 0.85 : 
+            topping.name === "Tomatoes" ? 1.6 : 
             0.85
           })`,
           width: "40px",
