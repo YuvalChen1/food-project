@@ -6,6 +6,7 @@ export type ToppingType = {
   renderType: 'scattered' | 'layer';
   layerImage?: string;
   zIndex: number;
+  renderImage?: string;
 };
 
 export const toppings: ToppingType[] = [
@@ -28,7 +29,8 @@ export const toppings: ToppingType[] = [
   {
     id: 3,
     name: 'Mushrooms',
-    image: '/toppings/mushrooms.png',
+    image: '/toppings/mushrooms_pick.png',
+    renderImage: '/toppings/mushroom_topping.png',
     price: 1,
     renderType: 'scattered',
     zIndex: 20
@@ -37,38 +39,34 @@ export const toppings: ToppingType[] = [
     id: 4,
     name: 'Onions',
     image: '/toppings/onions.png',
+    renderImage: '/toppings/onion_topping.png',
     price: 0.75,
     renderType: 'scattered',
     zIndex: 20
   },
   {
     id: 5,
-    name: 'Sausage',
-    image: '/toppings/sausage.png',
-    price: 1.5,
+    name: 'Tomatoes',
+    image: '/toppings/tomatoes.png',
+    renderImage: '/toppings/tomato_topping.png',
+    price: 0.75,
     renderType: 'scattered',
     zIndex: 20
   },
   {
     id: 6,
-    name: 'Bacon',
-    image: '/toppings/bacon.png',
-    price: 1.5,
-    renderType: 'scattered',
-    zIndex: 20
-  },
-  {
-    id: 7,
     name: 'Black olives',
     image: '/toppings/olives.png',
+    renderImage: '/toppings/olive_topping.png',
     price: 1,
     renderType: 'scattered',
     zIndex: 20
   },
   {
-    id: 8,
+    id: 7,
     name: 'Green peppers',
     image: '/toppings/green-peppers.png',
+    renderImage: '/toppings/pepper_topping.png',
     price: 0.75,
     renderType: 'scattered',
     zIndex: 20

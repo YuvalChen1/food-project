@@ -3,7 +3,6 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { UtensilsCrossed, X, Trash2, Mic, MicOff } from "lucide-react";
 import { toppings, ToppingType } from "@/data/toppings";
 import Swal from "sweetalert2";
@@ -30,7 +29,8 @@ interface Topping extends ToppingType {
 interface ToppingPosition {
   x: number;
   y: number;
-  rotation?: number;
+  rotation: number;
+  clipPath?: string;
 }
 
 const sizePrices: Record<string, number> = {
@@ -53,7 +53,6 @@ export default function PizzaBuilder() {
   const [pizzaSize, setPizzaSize] = useState<string>("m");
   const [pizzaToppings, setPizzaToppings] = useState<Topping[]>([]);
   // const [selectedTopping, setSelectedTopping] = useState<Topping | null>(null)
-  const [toppingPlacement, setToppingPlacement] = useState<string>("full");
   // const [isDragging, setIsDragging] = useState(false)
   const pizzaRef = useRef<HTMLDivElement>(null);
   // const draggedToppingRef = useRef<HTMLDivElement>(null)
@@ -68,6 +67,7 @@ export default function PizzaBuilder() {
   const [isProcessingAI, setIsProcessingAI] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [language, setLanguage] = useState<Language>('he');
+  const [activeToppingForPlacement, setActiveToppingForPlacement] = useState<Topping | null>(null);
 
   useEffect(() => {
     const preventDefault = (e: Event) => e.preventDefault();
@@ -87,138 +87,202 @@ export default function PizzaBuilder() {
 
   const handleToppingClick = (topping: Topping) => {
     if (!pizzaRef.current) return;
-
-    // Handle Extra cheese separately
-    if (topping.name === "Extra cheese") {
-      if (hasExtraCheese) {
-        // Remove cheese
-        setPizzaToppings(pizzaToppings.filter(t => t.name !== "Extra cheese"));
+    
+    // If it's already on the pizza, remove it
+    if (pizzaToppings.some(t => t.name === topping.name)) {
+      setPizzaToppings(pizzaToppings.filter(t => t.name !== topping.name));
+      if (topping.name === "Extra cheese") {
         setHasExtraCheese(false);
-      } else {
-        // Add cheese
-        const newTopping: Topping = {
-          ...topping,
-          placement: toppingPlacement,
-        };
-        setPizzaToppings([...pizzaToppings, newTopping]);
-        setHasExtraCheese(true);
-        setCheesePlacement(toppingPlacement);
       }
       return;
     }
 
-    // For other toppings
-    const existingToppingIndex = pizzaToppings.findIndex(
-      t => t.name === topping.name
-    );
+    // Show placement popup
+    setActiveToppingForPlacement(topping);
+  };
 
-    if (existingToppingIndex !== -1) {
-      // Remove the topping if it exists
-      const updatedToppings = pizzaToppings.filter((_, index) => index !== existingToppingIndex);
-      setPizzaToppings(updatedToppings);
-    } else {
-      // Add the topping with new positions
-      const newTopping: Topping = {
-        ...topping,
-        placement: toppingPlacement,
-        positions: generateToppingPositions(
-          toppingPlacement,
-          topping.renderType
-        ),
-      };
-      setPizzaToppings([...pizzaToppings, newTopping]);
+  const generateOnionClipPath = () => {
+    // Weighted array with many more broken/partial shapes
+    const types = [
+      'broken', 'broken', 'broken', 'broken', 'broken',  // 5 broken
+      'half', 'half', 'half',                           // 3 half
+      'three-quarters', 'three-quarters',               // 2 three-quarters
+      'full'                                           // Only 1 full
+    ];
+    const type = types[Math.floor(Math.random() * types.length)];
+    
+    switch(type) {
+      case 'three-quarters':
+        return 'polygon(0 0, 100% 0, 100% 100%, 75% 100%, 75% 25%, 0 25%)';
+      case 'half':
+        return 'polygon(0 0, 100% 0, 100% 50%, 0 50%)';
+      case 'broken':
+        return 'polygon(25% 0, 100% 0, 100% 75%, 75% 75%, 75% 25%, 25% 25%)';
+      default:
+        return 'none';
+    }
+  };
+
+  const generatePepperClipPath = () => {
+    // Weighted array heavily favoring partial cuts
+    const types = [
+      'partial', 'partial', 'partial', 'partial', 'partial',  // 5
+      'partial', 'partial', 'partial', 'partial', 'partial',  // 10
+      'diagonal', 'diagonal', 'diagonal',                     // 13
+      'half', 'half',                                        // 15
+      'full'                                                 // 16 total, only 1 full
+    ];
+    const type = types[Math.floor(Math.random() * types.length)];
+    
+    switch(type) {
+      case 'diagonal':
+        return 'polygon(20% 0, 100% 0, 100% 80%, 80% 100%, 0 100%, 0 20%)';
+      case 'half':
+        return 'polygon(0 0, 100% 0, 100% 50%, 0 50%)';
+      case 'partial':
+        // More aggressive partial cuts
+        const startX = Math.floor(Math.random() * 40) + 30;  // 30-70%
+        const endX = Math.floor(Math.random() * 20) + 80;    // 80-100%
+        const cutY = Math.floor(Math.random() * 30) + 35;    // 35-65%
+        return `polygon(${startX}% 0, ${endX}% 0, ${endX}% ${cutY}%, ${startX}% 100%, 0 100%, 0 ${cutY}%)`;
+      default:
+        return 'none';
     }
   };
 
   const generateToppingPositions = useCallback(
-    (
-      placement: string,
-      renderType: "scattered" | "layer"
-    ): ToppingPosition[] => {
+    (placement: string, renderType: "scattered" | "layer", toppingName: string): ToppingPosition[] => {
       if (renderType === "layer") return [];
 
-      const toppingCount = 15;
-      const radius = 0.35;
-      const minRadius = 0.1;
+      const outerRadius = 0.33;
+      const innerRadius = 0.12;
+      const centerX = 0.5;
+      const centerY = 0.5;
+      const safetyMargin = 0.02;
 
-      const isInsideCircle = (x: number, y: number) => {
-        const relX = x - 0.5;
-        const relY = y - 0.5;
-        return Math.sqrt(relX * relX + relY * relY) <= radius;
+      const isInsideValidArea = (x: number, y: number, side: string) => {
+        const dx = x - centerX;
+        const dy = y - centerY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        // Check if point is within the valid pizza area
+        if (distance > outerRadius || distance < innerRadius) return false;
+        
+        // For half placements
+        if (side === "left" && x > centerX) return false;
+        if (side === "right" && x < centerX) return false;
+
+        return true;
       };
 
       const generateValidPosition = (side: string): ToppingPosition => {
-        let x, y;
+        let x, y, rotation;
         let attempts = 0;
+        
         do {
-          if (side === "full") {
-            const ring = Math.random() < 0.7 ? "outer" : "inner";
-            const angle = Math.random() * 2 * Math.PI;
-
-            const r =
-              ring === "outer"
-                ? 0.25 + Math.random() * (radius - 0.25)
-                : minRadius + Math.random() * 0.15;
-
-            x = 0.5 + r * Math.cos(angle);
-            y = 0.5 + r * Math.sin(angle);
-          } else if (side === "left") {
-            const ring = Math.random() < 0.7 ? "outer" : "inner";
-            const baseAngle = Math.PI;
-            const angleSpread = Math.PI;
-            const angle = baseAngle + (Math.random() - 0.5) * angleSpread;
-
-            const r =
-              ring === "outer"
-                ? 0.25 + Math.random() * (radius - 0.25)
-                : minRadius + Math.random() * 0.15;
-
-            x = 0.5 + r * Math.cos(angle);
-            y = 0.5 + r * Math.sin(angle);
-          } else {
-            // right
-            const ring = Math.random() < 0.7 ? "outer" : "inner";
-            const baseAngle = 0;
-            const angleSpread = Math.PI;
-            const angle = baseAngle + (Math.random() - 0.5) * angleSpread;
-
-            const r =
-              ring === "outer"
-                ? 0.25 + Math.random() * (radius - 0.25)
-                : minRadius + Math.random() * 0.15;
-
-            x = 0.5 + r * Math.cos(angle);
-            y = 0.5 + r * Math.sin(angle);
-          }
+          const angle = Math.random() * Math.PI * 2;
+          const r = Math.sqrt(Math.random()) * (outerRadius - innerRadius - safetyMargin) + innerRadius;
+          
+          x = centerX + r * Math.cos(angle);
+          y = centerY + r * Math.sin(angle);
+          
+          rotation = Math.random() * 360;
+          
           attempts++;
-        } while (!isInsideCircle(x, y) && attempts < 100);
+        } while (!isInsideValidArea(x, y, side) && attempts < 100);
 
-        return { x, y };
+        // Tighter bounds
+        x = Math.max(0.18, Math.min(0.82, x));
+        y = Math.max(0.18, Math.min(0.82, y));
+
+        return { x, y, rotation };
       };
 
-      const addRandomRotation = (
-        position: ToppingPosition
-      ): ToppingPosition => {
-        return {
-          ...position,
-          rotation: Math.random() * 360,
-        };
-      };
+      const positions: ToppingPosition[] = [];
+      
+      if (placement === "full") {
+        // More varied ring configuration for full pizza
+        const rings = [
+          { count: 8, radius: outerRadius * (0.85 + Math.random() * 0.1) },   // Outer ring
+          { count: 7, radius: outerRadius * (0.65 + Math.random() * 0.1) },   // Middle-outer ring
+          { count: 6, radius: outerRadius * (0.45 + Math.random() * 0.1) },   // Middle-inner ring
+          { count: 4, radius: outerRadius * (0.25 + Math.random() * 0.1) }    // Inner ring
+        ];
 
-      const generatePositions = () => {
-        const positions = [];
-        const outerCount = Math.floor(toppingCount * 0.7);
-        for (let i = 0; i < outerCount; i++) {
-          positions.push(generateValidPosition(placement));
-        }
-        const innerCount = toppingCount - outerCount;
-        for (let i = 0; i < innerCount; i++) {
-          positions.push(generateValidPosition(placement));
-        }
-        return positions;
-      };
+        rings.forEach(ring => {
+          for (let i = 0; i < ring.count; i++) {
+            // Add more randomization to angle and radius
+            const baseAngle = (i / ring.count) * Math.PI * 2;
+            const angleVariation = (Math.random() * 0.5 - 0.25) * (Math.PI / ring.count);
+            const angle = baseAngle + angleVariation;
+            
+            // More varied radius
+            const radiusVariation = ring.radius * (0.85 + Math.random() * 0.3);
+            
+            const x = centerX + Math.cos(angle) * radiusVariation;
+            const y = centerY + Math.sin(angle) * radiusVariation;
+            
+            // More varied rotation
+            const rotation = Math.random() * 360;
 
-      return generatePositions().map(addRandomRotation);
+            if (x >= 0.18 && x <= 0.82 && y >= 0.18 && y <= 0.82) {
+              // Add slight offset to prevent perfect stacking
+              const offsetX = (Math.random() * 0.06 - 0.03);
+              const offsetY = (Math.random() * 0.06 - 0.03);
+              
+              positions.push({ 
+                x: x + offsetX, 
+                y: y + offsetY, 
+                rotation,
+                clipPath: toppingName === "Onions" ? generateOnionClipPath() : 
+                         toppingName === "Green peppers" ? generatePepperClipPath() :
+                         undefined
+              });
+            }
+          }
+        });
+      } else {
+        // Similar updates for half pizzas
+        const halfRings = [
+          { count: 5, radius: outerRadius * (0.85 + Math.random() * 0.1) },
+          { count: 4, radius: outerRadius * (0.65 + Math.random() * 0.1) },
+          { count: 3, radius: outerRadius * (0.45 + Math.random() * 0.1) },
+          { count: 2, radius: outerRadius * (0.25 + Math.random() * 0.1) }
+        ];
+
+        const baseAngle = placement === "left" ? Math.PI : 0;
+        
+        halfRings.forEach(ring => {
+          for (let i = 0; i < ring.count; i++) {
+            const baseRingAngle = (i / ring.count) * Math.PI - Math.PI/2;
+            const angleVariation = (Math.random() * 0.4 - 0.2);
+            const angle = baseAngle + baseRingAngle + angleVariation;
+            
+            const radiusVariation = ring.radius * (0.85 + Math.random() * 0.3);
+            
+            const x = centerX + Math.cos(angle) * radiusVariation;
+            const y = centerY + Math.sin(angle) * radiusVariation;
+            
+            const rotation = Math.random() * 360;
+
+            if (x >= 0.18 && x <= 0.82 && y >= 0.18 && y <= 0.82) {
+              const offsetX = (Math.random() * 0.06 - 0.03);
+              const offsetY = (Math.random() * 0.06 - 0.03);
+              
+              positions.push({ 
+                x: x + offsetX, 
+                y: y + offsetY, 
+                rotation,
+                clipPath: toppingName === "Onions" ? generateOnionClipPath() : 
+                         toppingName === "Green peppers" ? generatePepperClipPath() :
+                         undefined
+              });
+            }
+          }
+        });
+      }
+
+      return positions;
     },
     []
   );
@@ -306,44 +370,52 @@ export default function PizzaBuilder() {
     }
   };
 
-  const renderTopping = (topping: Topping) => {
-    if (topping.renderType === "layer") {
-      return (
-        <Image
-          key={topping.id}
-          src={topping.layerImage || topping.image}
-          alt={topping.name}
-          fill
-          className="absolute inset-0 object-cover pointer-events-none"
-          style={{
-            opacity: 0.8,
-            zIndex: topping.zIndex,
-          }}
-        />
-      );
+  const renderTopping = useCallback((topping: Topping) => {
+    if (topping.name === "Extra cheese") {
+      return null;
     }
 
-    return topping.positions?.map((position, i) => (
-      <Image
-        key={`${topping.id}-${i}-${Math.random()}`}
-        src={topping.image}
-        alt={topping.name}
-        width={40}
-        height={40}
-        className="absolute w-10 h-10 object-contain pointer-events-none select-none"
+    return topping.positions?.map((pos, idx) => (
+      <div
+        key={`${topping.name}-${idx}`}
+        className="absolute"
         style={{
-          left: `${position.x * 100}%`,
-          top: `${position.y * 100}%`,
-          transform: `translate(-50%, -50%) rotate(${position.rotation}deg)`,
-          zIndex: topping.zIndex,
-          backgroundColor: "transparent",
-          mixBlendMode: "multiply",
-          filter: "drop-shadow(1px 2px 3px rgba(0,0,0,0.5))",
-          opacity: 1,
+          left: `${pos.x * 100}%`,
+          top: `${pos.y * 100}%`,
+          transform: `translate(-50%, -50%) rotate(${pos.rotation}deg) scale(${
+            topping.name === "Black olives" ? 0.5 : 
+            topping.name === "Onions" ? 0.8 :
+            topping.name === "Mushrooms" ? 0.7 :
+            topping.name === "Green peppers" ? 0.85 : 
+            0.85
+          })`,
+          width: "40px",
+          height: "40px",
         }}
-      />
+      >
+        <div
+          style={{
+            width: '100%',
+            height: '100%',
+            clipPath: pos.clipPath || 'none',
+          }}
+        >
+          <Image
+            src={topping.renderImage || topping.image}
+            alt={topping.name}
+            width={40}
+            height={40}
+            className="w-full h-full object-contain select-none"
+            style={{
+              filter: "drop-shadow(2px 2px 2px rgba(0,0,0,0.2))",
+              mixBlendMode: "multiply",
+            }}
+            priority
+          />
+        </div>
+      </div>
     ));
-  };
+  }, []);
 
   const removeTopping = (toppingId: number) => {
     const topping = pizzaToppings.find((t) => t.id === toppingId);
@@ -373,7 +445,7 @@ export default function PizzaBuilder() {
         return {
           ...topping,
           placement: orderDetails.placement || 'full',
-          positions: generateToppingPositions(orderDetails.placement || 'full', topping.renderType)
+          positions: generateToppingPositions(orderDetails.placement || 'full', topping.renderType, topping.name)
         };
       }).filter(t => t !== null);
 
@@ -463,6 +535,52 @@ export default function PizzaBuilder() {
     const formattedPrice = formatPrice(price);
     return language === 'he' ? `(${formattedPrice})` : `(${formattedPrice})`;
   };
+
+  const handlePlacementSelect = (placement: string) => {
+    if (!activeToppingForPlacement) return;
+
+    // Generate positions only when adding the topping
+    const existingTopping = pizzaToppings.find(t => t.name === activeToppingForPlacement.name);
+    
+    // If topping exists, use its positions (shouldn't happen due to our click handler, but just in case)
+    if (existingTopping) {
+      setActiveToppingForPlacement(null);
+      return;
+    }
+
+    // Generate new positions only for new topping
+    const newTopping: Topping = {
+      ...activeToppingForPlacement,
+      placement,
+      positions: generateToppingPositions(
+        placement,
+        activeToppingForPlacement.renderType,
+        activeToppingForPlacement.name
+      ),
+    };
+
+    setPizzaToppings([...pizzaToppings, newTopping]);
+    if (activeToppingForPlacement.name === "Extra cheese") {
+      setHasExtraCheese(true);
+      setCheesePlacement(placement);
+    }
+    
+    setActiveToppingForPlacement(null);
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (activeToppingForPlacement) {
+        const target = e.target as HTMLElement;
+        if (!target.closest('.topping-placement-popup')) {
+          setActiveToppingForPlacement(null);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [activeToppingForPlacement]);
 
   return (
     <div className={`flex flex-col min-h-screen overflow-x-hidden ${language === 'he' ? 'rtl' : 'ltr'}`}>
@@ -589,27 +707,6 @@ export default function PizzaBuilder() {
                 {translations[language].sizes.large}
               </Button>
             </div>
-
-            <div className="flex justify-center mt-4 space-x-4">
-              <Button
-                onClick={() => setToppingPlacement("full")}
-                variant={toppingPlacement === "full" ? "default" : "outline"}
-              >
-                {translations[language].placement.full}
-              </Button>
-              <Button
-                onClick={() => setToppingPlacement("left")}
-                variant={toppingPlacement === "left" ? "default" : "outline"}
-              >
-                {translations[language].placement.leftHalf}
-              </Button>
-              <Button
-                onClick={() => setToppingPlacement("right")}
-                variant={toppingPlacement === "right" ? "default" : "outline"}
-              >
-                {translations[language].placement.rightHalf}
-              </Button>
-            </div>
           </div>
 
           <div className="flex-1">
@@ -621,76 +718,138 @@ export default function PizzaBuilder() {
                 {toppings.map((topping) => (
                   <div
                     key={topping.name}
-                    className={`relative p-2 sm:p-3 flex flex-col items-center transform transition-transform hover:scale-105 ${
+                    className="relative"
+                  >
+                    {activeToppingForPlacement?.name === topping.name && (
+                      <div className="absolute -top-16 left-1/2 -translate-x-1/2 bg-white rounded-lg shadow-lg p-2 z-50 topping-placement-popup">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation(); // Prevent event bubbling
+                              handlePlacementSelect('full');
+                            }}
+                            className="w-8 h-8 rounded-full border-2 border-gray-300 hover:border-blue-500 transition-colors"
+                            title="Full"
+                          >
+                            <div className="w-full h-full rounded-full bg-gray-200 hover:bg-blue-100" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation(); // Prevent event bubbling
+                              handlePlacementSelect('left');
+                            }}
+                            className="w-8 h-8 rounded-full border-2 border-gray-300 hover:border-blue-500 transition-colors overflow-hidden"
+                            title="Left Half"
+                          >
+                            <div className="w-1/2 h-full bg-gray-200 hover:bg-blue-100" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation(); // Prevent event bubbling
+                              handlePlacementSelect('right');
+                            }}
+                            className="w-8 h-8 rounded-full border-2 border-gray-300 hover:border-blue-500 transition-colors overflow-hidden"
+                            title="Right Half"
+                          >
+                            <div className="w-1/2 h-full bg-gray-200 hover:bg-blue-100 ml-auto" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div className={`relative p-2 sm:p-3 flex flex-col items-center transform transition-transform hover:scale-105 ${
                       pizzaToppings.some(t => t.name === topping.name) ? 
                       'ring-2 ring-blue-500 ring-offset-2 sm:ring-offset-4 rounded-full bg-blue-50' : ''
                     }`}
-                  >
-                    {/* Metal bowl container */}
-                    <div
-                      className={`relative w-[85%] aspect-square rounded-full min-w-[45px] sm:min-w-[50px] max-w-[70px] sm:max-w-[80px] lg:max-w-[85px] mx-auto ${
-                        pizzaToppings.some(t => t.name === topping.name) ? 'scale-95' : ''
-                      }`}
-                      style={{
-                        background: "linear-gradient(145deg, #c8c8c8, #e6e6e6)",
-                        boxShadow: `
-                          inset 0 4px 8px rgba(0,0,0,0.3),
-                          inset 0 -2px 4px rgba(255,255,255,0.4),
-                          0 2px 4px rgba(0,0,0,0.2)
-                        `,
-                        transform: "perspective(500px) rotateX(10deg)",
-                      }}
                     >
-                      {/* Inner bowl shadow/highlight */}
-                      <div
-                        className="absolute inset-[2px] rounded-full pointer-events-none"
-                        style={{
-                          background:
-                            "linear-gradient(135deg, rgba(255,255,255,0.4) 0%, transparent 50%, rgba(0,0,0,0.2) 100%)",
-                          border: "1px solid rgba(255,255,255,0.2)",
-                        }}
-                      />
-
-                      {/* Topping container */}
-                      <div
-                        className="absolute inset-0 flex items-center justify-center cursor-pointer"
-                        onClick={() => handleToppingClick(topping)}
-                      >
-                        <div className="w-3/4 h-3/4 relative">
-                          <Image
-                            src={topping.image}
-                            alt={topping.name}
-                            width={40}
-                            height={40}
-                            className="w-full h-full object-contain select-none"
-                            style={{
-                              backgroundColor: "transparent",
-                              mixBlendMode: "multiply",
-                              filter: "drop-shadow(0 2px 2px rgba(0,0,0,0.2))",
-                            }}
-                          />
+                      {/* Add placement indicator */}
+                      {pizzaToppings.some(t => t.name === topping.name) && (
+                        <div className="absolute top-0 right-0 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center transform translate-x-1/3 -translate-y-1/3 shadow-md">
+                          {pizzaToppings.find(t => t.name === topping.name)?.placement === 'full' ? (
+                            <div className="w-4 h-4 rounded-full bg-black" />
+                          ) : pizzaToppings.find(t => t.name === topping.name)?.placement === 'left' ? (
+                            <div className="w-4 h-4 rounded-full overflow-hidden bg-white">
+                              <div className="w-1/2 h-full bg-black" />  {/* Left half black */}
+                            </div>
+                          ) : (
+                            <div className="w-4 h-4 rounded-full overflow-hidden bg-white">
+                              <div className="w-1/2 h-full bg-black float-right" />  {/* Right half black */}
+                            </div>
+                          )}
                         </div>
+                      )}
+                      
+                      {/* Metal bowl container */}
+                      <div
+                        className={`relative w-[85%] aspect-square rounded-full min-w-[45px] sm:min-w-[50px] max-w-[70px] sm:max-w-[80px] lg:max-w-[85px] mx-auto ${
+                          pizzaToppings.some(t => t.name === topping.name) ? 'scale-95' : ''
+                        }`}
+                        style={{
+                          background: "linear-gradient(145deg, #d4d4d4, #e8e8e8)",
+                          boxShadow: `
+                            inset 0 4px 8px rgba(0,0,0,0.25),
+                            inset 0 -2px 4px rgba(255,255,255,0.5),
+                            0 2px 4px rgba(0,0,0,0.15)
+                          `,
+                          transform: "perspective(500px) rotateX(12deg)",
+                        }}
+                      >
+                        {/* Inner bowl shadow/highlight */}
+                        <div
+                          className="absolute inset-[2px] rounded-full pointer-events-none"
+                          style={{
+                            background:
+                              "linear-gradient(135deg, rgba(255,255,255,0.4) 0%, transparent 50%, rgba(0,0,0,0.2) 100%)",
+                            border: "1px solid rgba(255,255,255,0.2)",
+                          }}
+                        />
+
+                        {/* Topping container */}
+                        <div
+                          className="absolute inset-0 flex items-center justify-center cursor-pointer"
+                          onClick={() => handleToppingClick(topping)}
+                        >
+                          <div className={`w-[85%] h-[85%] relative ${  // Increased from w-3/4 h-3/4
+                            topping.name === "Tomatoes" ? "scale-125" : ""  // Special scale for tomatoes
+                          }`}>
+                            <Image
+                              src={topping.image}
+                              alt={topping.name}
+                              width={100}
+                              height={100}
+                              className="w-full h-full object-contain select-none"
+                              style={{
+                                backgroundColor: "transparent",
+                                mixBlendMode: "multiply",
+                                filter: "drop-shadow(0 2px 2px rgba(0,0,0,0.2)) contrast(1.1) saturate(1.2)",
+                                imageRendering: "crisp-edges",
+                              }}
+                              quality={100}
+                              unoptimized={topping.name === "Mushrooms"}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Rim highlight */}
+                        <div
+                          className="absolute inset-0 rounded-full pointer-events-none"
+                          style={{
+                            background:
+                              "linear-gradient(45deg, rgba(255,255,255,0.2) 0%, transparent 70%)",
+                            border: "1px solid rgba(255,255,255,0.3)",
+                          }}
+                        />
                       </div>
 
-                      {/* Rim highlight */}
-                      <div
-                        className="absolute inset-0 rounded-full pointer-events-none"
-                        style={{
-                          background:
-                            "linear-gradient(45deg, rgba(255,255,255,0.2) 0%, transparent 70%)",
-                          border: "1px solid rgba(255,255,255,0.3)",
-                        }}
-                      />
-                    </div>
-
-                    {/* Labels */}
-                    <div className="mt-2 text-center">
-                      <p className="text-[11px] sm:text-xs font-medium text-gray-700">
-                        {getToppingTranslation(topping.name)}
-                      </p>
-                      <p className="text-[10px] sm:text-xs text-gray-500">
-                        {formatPrice(topping.price)}
-                      </p>
+                      {/* Labels */}
+                      <div className="mt-2 text-center">
+                        <p className="text-[11px] sm:text-xs font-medium text-gray-700">
+                          {getToppingTranslation(topping.name)}
+                        </p>
+                        <p className="text-[10px] sm:text-xs text-gray-500">
+                          {formatPrice(topping.price)}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 ))}

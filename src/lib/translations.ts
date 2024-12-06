@@ -44,6 +44,7 @@ export const translations = {
       sausage: "Sausage",
       blackOlives: "Black olives",
       greenPeppers: "Green peppers",
+      tomatoes: "Tomatoes",
       // add any other missing toppings...
     },
     currency: {
@@ -56,9 +57,9 @@ export const translations = {
     buildPizza: "בנה את הפיצה המושלמת שלך",
     toppings: "תוספות",
     sizes: {
-      small: "ק",
-      medium: "ב",
-      large: "ג"
+      small: "S",
+      medium: "M",
+      large: "L"
     },
     placement: {
       full: "מלא",
@@ -96,6 +97,7 @@ export const translations = {
       sausage: "נקניקיות",
       blackOlives: "זיתים שחורים",
       greenPeppers: "פלפל ירוק",
+      tomatoes: "עגבניות",
       // add any other missing toppings...
     },
     currency: {
