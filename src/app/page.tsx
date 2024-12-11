@@ -531,7 +531,7 @@ export default function PizzaBuilder() {
       await Swal.fire({
         title: language === 'he' ? "ההזמנה נוצרה!" : "Order Created!",
         text: language === 'he'
-          ? 'הפיצה ��לך הותאמה אישית. לחץ על "השלם הזמנה" כדי להמשיך'
+          ? 'הפיצה לך הותאמה אישית. לחץ על "השלם הזמנה" כדי להמשיך'
           : "Your pizza has been customized. Click 'Complete Order' when you're ready to proceed.",
         icon: "success",
         confirmButtonColor: "#3085d6",
@@ -562,33 +562,37 @@ export default function PizzaBuilder() {
       const SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
       const recognition = new SpeechRecognition();
       
+      // Set language before other settings
+      recognition.lang = language === 'he' ? 'he-IL' : 'en-US';
+      
       // iOS Safari specific settings
       if (isIOS && isSafari) {
-        recognition.continuous = false;  // Changed to false
+        recognition.continuous = false;
         recognition.interimResults = false;
         recognition.maxAlternatives = 1;
-        recognition.lang = language === 'he' ? 'he-IL' : 'en-US';
         
-        // Add short timeout before starting
+        // For Hebrew on iOS, we need a slightly longer timeout
+        const timeoutDelay = language === 'he' ? 300 : 100;
+        
         setTimeout(() => {
           try {
             recognition.start();
+            // Force focus on input to ensure keyboard doesn't appear
+            document.activeElement instanceof HTMLElement && document.activeElement.blur();
           } catch (error) {
             console.error('iOS start error:', error);
             setIsListening(false);
           }
-        }, 100);
+        }, timeoutDelay);
       } else {
-        // Non-iOS settings
         recognition.continuous = false;
         recognition.interimResults = false;
-        recognition.lang = language === 'he' ? 'he-IL' : 'en-US';
         recognition.start();
       }
       
       recognition.onstart = () => {
         setIsListening(true);
-        console.log('Speech recognition started');
+        console.log('Speech recognition started, language:', recognition.lang);
       };
 
       recognition.onresult = (event: any) => {
