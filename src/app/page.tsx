@@ -531,7 +531,7 @@ export default function PizzaBuilder() {
       await Swal.fire({
         title: language === 'he' ? "ההזמנה נוצרה!" : "Order Created!",
         text: language === 'he'
-          ? 'הפיצה שלך הותאמה אישית. לחץ על "השלם הזמנה" כדי להמשיך'
+          ? 'הפיצה ��לך הותאמה אישית. לחץ על "השלם הזמנה" כדי להמשיך'
           : "Your pizza has been customized. Click 'Complete Order' when you're ready to proceed.",
         icon: "success",
         confirmButtonColor: "#3085d6",
@@ -555,7 +555,6 @@ export default function PizzaBuilder() {
   };
 
   const startListening = () => {
-    // Check if running in iOS Safari
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
     const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
     
@@ -563,33 +562,44 @@ export default function PizzaBuilder() {
       const SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
       const recognition = new SpeechRecognition();
       
-      // Special handling for iOS
+      // iOS Safari specific settings
       if (isIOS && isSafari) {
-        recognition.continuous = true;  // Changed for iOS
-        recognition.interimResults = true;  // Changed for iOS
+        recognition.continuous = false;  // Changed to false
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+        recognition.lang = language === 'he' ? 'he-IL' : 'en-US';
+        
+        // Add short timeout before starting
+        setTimeout(() => {
+          try {
+            recognition.start();
+          } catch (error) {
+            console.error('iOS start error:', error);
+            setIsListening(false);
+          }
+        }, 100);
       } else {
+        // Non-iOS settings
         recognition.continuous = false;
         recognition.interimResults = false;
+        recognition.lang = language === 'he' ? 'he-IL' : 'en-US';
+        recognition.start();
       }
-      
-      // Force language based on app language
-      recognition.lang = language === 'he' ? 'he-IL' : 'en-US';
       
       recognition.onstart = () => {
         setIsListening(true);
-        console.log('Speech recognition started'); // Debug log
+        console.log('Speech recognition started');
       };
 
       recognition.onresult = (event: any) => {
-        console.log('Speech recognition result received', event);
-        const last = event.results.length - 1;
-        const transcript = event.results[last][0].transcript;
-        
-        if (event.results[last].isFinal) {
+        console.log('Speech recognition result:', event);
+        if (event.results && event.results.length > 0) {
+          const transcript = event.results[0][0].transcript;
+          console.log('Transcript:', transcript);
           setAIMessage(transcript);
-          setIsListening(false);
-          recognition.stop();
         }
+        setIsListening(false);
+        recognition.stop();
       };
 
       recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
@@ -626,13 +636,6 @@ export default function PizzaBuilder() {
         console.log('Speech recognition ended'); // Debug log
         setIsListening(false);
       };
-
-      try {
-        recognition.start();
-      } catch (error) {
-        console.error('Failed to start speech recognition:', error);
-        setIsListening(false);
-      }
     } else {
       // Show browser not supported message
       Swal.fire({
