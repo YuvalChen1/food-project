@@ -19,7 +19,7 @@ export default function FirebaseProvider({ children }: { children: React.ReactNo
 
     // Check for missing required variables
     const missingVars = Object.entries(envVars)
-      .filter(([_, value]) => !value)
+      .filter(([key, value]) => !value && key in envVars)
       .map(([key]) => key);
 
     if (missingVars.length > 0) {
