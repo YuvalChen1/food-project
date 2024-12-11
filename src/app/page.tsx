@@ -506,15 +506,25 @@ export default function PizzaBuilder() {
       const SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
       const recognition = new SpeechRecognition();
       
-      // iOS specific settings
+      // iOS Safari specific settings
       if (isIOS && isSafari) {
+        // Stop any existing instances
+        try {
+          recognition.abort();
+        } catch (e) {
+          console.log('No active recognition to abort');
+        }
+        
+        // Configure for iOS
         recognition.continuous = false;
         recognition.interimResults = false;
         recognition.maxAlternatives = 1;
+        
+        // Set language with region code
         recognition.lang = language === 'he' ? 'he-IL' : 'en-US';
         
-        // Stop any existing recognition
-        recognition.stop();
+        // Longer timeout for Hebrew
+        const startDelay = language === 'he' ? 800 : 500;
         
         // Clear any existing handlers
         recognition.onstart = null;
@@ -522,6 +532,7 @@ export default function PizzaBuilder() {
         recognition.onerror = null;
         recognition.onend = null;
       } else {
+        // Desktop settings
         recognition.continuous = false;
         recognition.interimResults = false;
         recognition.lang = language === 'he' ? 'he-IL' : 'en-US';
@@ -529,47 +540,53 @@ export default function PizzaBuilder() {
       
       recognition.onstart = () => {
         setIsListening(true);
-        console.log('Speech recognition started, language:', recognition.lang);
+        console.log('Started listening in:', recognition.lang);
       };
 
       recognition.onresult = (event: any) => {
-        console.log('Speech recognition result:', event);
-        const transcript = event.results[0][0].transcript;
-        console.log('Transcript:', transcript);
-        setAIMessage(transcript);
+        if (event.results && event.results[0]) {
+          const transcript = event.results[0][0].transcript;
+          console.log('Got transcript:', transcript);
+          setAIMessage(transcript);
+        }
         setIsListening(false);
       };
 
       recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-        console.error('Speech recognition error:', event.error);
+        console.error('Recognition error:', event.error);
         setIsListening(false);
         
-        const errorMessage = language === 'he' 
-          ? 'אירעה שגיאה בזיהוי קול. אנא נסה שוב'
-          : 'Voice recognition error. Please try again';
-        
-        Swal.fire({
-          title: language === 'he' ? "שגיאת זיהוי קול" : "Voice Recognition Error",
-          text: errorMessage,
-          icon: "warning",
-          confirmButtonText: language === 'he' ? "הבנתי" : "OK"
-        });
+        // Show error only for actual errors, not cancellations
+        if (event.error !== 'aborted') {
+          Swal.fire({
+            title: language === 'he' ? "שגיאת זיהוי קול" : "Voice Recognition Error",
+            text: language === 'he' 
+              ? 'אנא נסה שוב או הקלד את הזמנתך'
+              : 'Please try again or type your order',
+            icon: "warning",
+            confirmButtonText: language === 'he' ? "הבנתי" : "OK"
+          });
+        }
       };
 
       recognition.onend = () => {
-        console.log('Speech recognition ended');
+        console.log('Recognition ended');
         setIsListening(false);
       };
 
-      // Start recognition with a slight delay for iOS
-      setTimeout(() => {
-        try {
-          recognition.start();
-        } catch (error) {
-          console.error('Start error:', error);
-          setIsListening(false);
-        }
-      }, isIOS ? 350 : 0);
+      // Start with delay for iOS
+      if (isIOS && isSafari) {
+        setTimeout(() => {
+          try {
+            recognition.start();
+          } catch (error) {
+            console.error('Start error:', error);
+            setIsListening(false);
+          }
+        }, language === 'he' ? 800 : 500);
+      } else {
+        recognition.start();
+      }
     }
   };
 
