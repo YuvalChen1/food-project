@@ -506,33 +506,25 @@ export default function PizzaBuilder() {
       const SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
       const recognition = new SpeechRecognition();
       
-      // Set language before other settings
-      recognition.lang = language === 'he' ? 'he-IL' : 'en-US';
-      
-      // iOS Safari specific settings
+      // iOS specific settings
       if (isIOS && isSafari) {
         recognition.continuous = false;
         recognition.interimResults = false;
         recognition.maxAlternatives = 1;
+        recognition.lang = language === 'he' ? 'he-IL' : 'en-US';
         
-        // For Hebrew on iOS, we need a slightly longer timeout
-        const timeoutDelay = language === 'he' ? 300 : 100;
+        // Stop any existing recognition
+        recognition.stop();
         
-        setTimeout(() => {
-          try {
-            recognition.start();
-            if (document.activeElement instanceof HTMLElement) {
-              document.activeElement.blur();
-            }
-          } catch (error) {
-            console.error('iOS start error:', error);
-            setIsListening(false);
-          }
-        }, timeoutDelay);
+        // Clear any existing handlers
+        recognition.onstart = null;
+        recognition.onresult = null;
+        recognition.onerror = null;
+        recognition.onend = null;
       } else {
         recognition.continuous = false;
         recognition.interimResults = false;
-        recognition.start();
+        recognition.lang = language === 'he' ? 'he-IL' : 'en-US';
       }
       
       recognition.onstart = () => {
@@ -542,36 +534,19 @@ export default function PizzaBuilder() {
 
       recognition.onresult = (event: any) => {
         console.log('Speech recognition result:', event);
-        if (event.results && event.results.length > 0) {
-          const transcript = event.results[0][0].transcript;
-          console.log('Transcript:', transcript);
-          setAIMessage(transcript);
-        }
+        const transcript = event.results[0][0].transcript;
+        console.log('Transcript:', transcript);
+        setAIMessage(transcript);
         setIsListening(false);
-        recognition.stop();
       };
 
       recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-        console.error('Speech recognition error:', event.error, event); // Debug log
+        console.error('Speech recognition error:', event.error);
         setIsListening(false);
         
-        let errorMessage = '';
-        switch (event.error) {
-          case 'not-allowed':
-            errorMessage = language === 'he' 
-              ? 'אין הרשאה למיקרופון. אנא אשר גישה בהגדרות הדפדפן'
-              : 'Microphone access denied. Please allow access in browser settings';
-            break;
-          case 'no-speech':
-            errorMessage = language === 'he'
-              ? 'לא זוהה דיבור. אנא נסה שוב'
-              : 'No speech detected. Please try again';
-            break;
-          default:
-            errorMessage = language === 'he'
-              ? 'אירעה שגיאה בזיהוי קול. אנא נסה שוב'
-              : 'Voice recognition error. Please try again';
-        }
+        let errorMessage = language === 'he' 
+          ? 'אירעה שגיאה בזיהוי קול. אנא נסה שוב'
+          : 'Voice recognition error. Please try again';
         
         Swal.fire({
           title: language === 'he' ? "שגיאת זיהוי קול" : "Voice Recognition Error",
@@ -582,19 +557,19 @@ export default function PizzaBuilder() {
       };
 
       recognition.onend = () => {
-        console.log('Speech recognition ended'); // Debug log
+        console.log('Speech recognition ended');
         setIsListening(false);
       };
-    } else {
-      // Show browser not supported message
-      Swal.fire({
-        title: language === 'he' ? "דפדפן לא נתמך" : "Browser Not Supported",
-        text: language === 'he'
-          ? "זיהוי קול אינו נתמך בדפדפן זה. אנא השתמש בדפדפן עדכני יותר או הקלד את הזמנתך"
-          : "Voice recognition is not supported in this browser. Please use a modern browser or type your order",
-        icon: "warning",
-        confirmButtonText: language === 'he' ? "הבנתי" : "OK"
-      });
+
+      // Start recognition with a slight delay for iOS
+      setTimeout(() => {
+        try {
+          recognition.start();
+        } catch (error) {
+          console.error('Start error:', error);
+          setIsListening(false);
+        }
+      }, isIOS ? 350 : 0);
     }
   };
 
