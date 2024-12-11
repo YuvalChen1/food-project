@@ -15,7 +15,25 @@ interface TrendAnalysis {
   recommendation: string;
 }
 
-export async function trackUnavailableToppingRequest(toppingName: string) {
+export const trackAIOrder = async (order: {
+  toppings: string[];
+  size: string;
+  placement: string;
+}) => {
+  try {
+    const analyticsRef = collection(db, 'analytics');
+    await addDoc(analyticsRef, {
+      type: 'ai_order',
+      ...order,
+      timestamp: new Date()
+    });
+    console.log('Tracked AI order:', order);
+  } catch (error) {
+    console.log('Analytics tracking failed:', error);
+  }
+};
+
+export const trackUnavailableToppingRequest = async (toppingName: string) => {
   try {
     const requestsRef = collection(db, "toppingRequests");
     const q = query(requestsRef, where("toppingName", "==", toppingName));
@@ -36,9 +54,9 @@ export async function trackUnavailableToppingRequest(toppingName: string) {
       });
     }
   } catch (error) {
-    console.error("Error tracking topping request:", error);
+    console.log('Analytics tracking failed:', error);
   }
-}
+};
 
 export async function analyzeTrends(): Promise<TrendAnalysis[]> {
   try {
@@ -74,4 +92,40 @@ export async function analyzeTrends(): Promise<TrendAnalysis[]> {
     console.error("Error analyzing trends:", error);
     throw error;
   }
-} 
+}
+
+export const trackToppingUsage = async (toppingName: string, placement: string) => {
+  try {
+    const toppingStatsRef = collection(db, "toppingStats");
+    const q = query(toppingStatsRef, where("toppingName", "==", toppingName));
+    const querySnapshot = await getDocs(q);
+
+    if (querySnapshot.empty) {
+      await addDoc(toppingStatsRef, {
+        toppingName,
+        totalUses: 1,
+        placements: {
+          full: placement === 'full' ? 1 : 0,
+          left: placement === 'left' ? 1 : 0,
+          right: placement === 'right' ? 1 : 0
+        },
+        firstUsed: new Date(),
+        lastUsed: new Date()
+      });
+    } else {
+      const doc = querySnapshot.docs[0];
+      const data = doc.data();
+      await updateDoc(doc.ref, {
+        totalUses: data.totalUses + 1,
+        placements: {
+          full: data.placements.full + (placement === 'full' ? 1 : 0),
+          left: data.placements.left + (placement === 'left' ? 1 : 0),
+          right: data.placements.right + (placement === 'right' ? 1 : 0)
+        },
+        lastUsed: new Date()
+      });
+    }
+  } catch (error) {
+    console.log('Analytics tracking failed:', error);
+  }
+}; 

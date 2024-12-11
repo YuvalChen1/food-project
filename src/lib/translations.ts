@@ -24,7 +24,8 @@ export const translations = {
       name: "Your Name",
       namePlaceholder: "Enter your name",
       phone: "Phone Number",
-      phonePlaceholder: "Enter your phone number"
+      phonePlaceholder: "Enter your phone number",
+      description: "Please provide your contact details to complete the order"
     },
     ai: {
       button: "Order with AI",
@@ -77,7 +78,8 @@ export const translations = {
       name: "שם מלא",
       namePlaceholder: "הכנס את שמך",
       phone: "מספר טלפון",
-      phonePlaceholder: "הכנס מספר טלפון"
+      phonePlaceholder: "הכנס מספר טלפון",
+      description: "אנא הזן את פרטי ההתקשרות שלך להשלמת ההזמנה"
     },
     ai: {
       button: "הזמן עם AI",

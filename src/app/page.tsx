@@ -150,6 +150,54 @@ export default function PizzaBuilder() {
     }
   };
 
+  const generateHalfPositions = (side: string, count: number, toppingName: string) => {
+    const positions: ToppingPosition[] = [];
+    const bufferZone = 0.08;  // Increased buffer from center
+    
+    // Define the valid area for each half
+    const validXRange = side === "left" 
+      ? [0.18, 0.5 - bufferZone]  // Left half range
+      : [0.5 + bufferZone, 0.82]; // Right half range
+      
+    // Create a grid-like pattern with randomization
+    const rows = 5;
+    const itemsPerRow = Math.ceil(count / rows);
+    
+    for (let row = 0; row < rows; row++) {
+      const yPos = 0.25 + (row * 0.5 / rows);  // Distribute vertically
+      
+      for (let col = 0; col < itemsPerRow; col++) {
+        if (positions.length >= count) break;
+        
+        // Calculate base position
+        const xRange = validXRange[1] - validXRange[0];
+        const baseX = validXRange[0] + (col * xRange / itemsPerRow);
+        
+        // Add randomization
+        const randX = baseX + (Math.random() * 0.08 - 0.04);
+        const randY = yPos + (Math.random() * 0.08 - 0.04);
+        
+        // Check if position is valid
+        const dx = randX - 0.5;
+        const dy = randY - 0.5;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        if (distance <= 0.33 && distance >= 0.12) {  // Keep within pizza bounds
+          positions.push({
+            x: randX,
+            y: randY,
+            rotation: Math.random() * 360,
+            clipPath: toppingName === "Onions" ? generateOnionClipPath() : 
+                     toppingName === "Green peppers" ? generatePepperClipPath() :
+                     undefined
+          });
+        }
+      }
+    }
+    
+    return positions;
+  };
+
   const generateToppingPositions = useCallback(
     (placement: string, renderType: "scattered" | "layer", toppingName: string): ToppingPosition[] => {
       if (renderType === "layer") return [];
@@ -168,9 +216,25 @@ export default function PizzaBuilder() {
         // Check if point is within the valid pizza area
         if (distance > outerRadius || distance < innerRadius) return false;
         
-        // For half placements
-        if (side === "left" && x > centerX) return false;
-        if (side === "right" && x < centerX) return false;
+        // Larger buffer zone and strict half boundaries
+        const bufferZone = 0.06;  // Increased from 0.04
+        
+        if (side === "left") {
+          // For left half, ensure x is well within left side
+          // Add extra margin from center
+          if (x > (centerX - bufferZone)) return false;
+          // Add curved boundary near the center
+          const distanceFromCenter = Math.abs(x - centerX);
+          if (distanceFromCenter < bufferZone * (1 + Math.abs(y - centerY))) return false;
+        }
+        if (side === "right") {
+          // For right half, ensure x is well within right side
+          // Add extra margin from center
+          if (x < (centerX + bufferZone)) return false;
+          // Add curved boundary near the center
+          const distanceFromCenter = Math.abs(x - centerX);
+          if (distanceFromCenter < bufferZone * (1 + Math.abs(y - centerY))) return false;
+        }
 
         return true;
       };
@@ -254,8 +318,9 @@ export default function PizzaBuilder() {
         
         halfRings.forEach(ring => {
           for (let i = 0; i < ring.count; i++) {
-            const baseRingAngle = (i / ring.count) * Math.PI - Math.PI/2;
-            const angleVariation = (Math.random() * 0.4 - 0.2);
+            const angleSpread = Math.PI;  // 180 degrees
+            const baseRingAngle = (i / (ring.count - 1)) * angleSpread - angleSpread/2;
+            const angleVariation = (Math.random() * 0.2 - 0.1);  // Reduced variation
             const angle = baseAngle + baseRingAngle + angleVariation;
             
             const radiusVariation = ring.radius * (0.85 + Math.random() * 0.3);
@@ -266,8 +331,8 @@ export default function PizzaBuilder() {
             const rotation = Math.random() * 360;
 
             if (x >= 0.18 && x <= 0.82 && y >= 0.18 && y <= 0.82) {
-              const offsetX = (Math.random() * 0.06 - 0.03);
-              const offsetY = (Math.random() * 0.06 - 0.03);
+              const offsetX = (Math.random() * 0.04 - 0.02);  // Reduced offset
+              const offsetY = (Math.random() * 0.04 - 0.02);  // Reduced offset
               
               positions.push({ 
                 x: x + offsetX, 
@@ -312,10 +377,11 @@ export default function PizzaBuilder() {
       // Validate contact details
       if (!customerName.trim() || !phoneNumber.trim()) {
         await Swal.fire({
-          title: "Missing Information",
-          text: "Please provide your name and phone number",
+          title: language === 'he' ? "מידע חסר" : "Missing Information",
+          text: language === 'he' ? "אנא הזן שם ומספר טלפון" : "Please provide your name and phone number",
           icon: "error",
           confirmButtonColor: "#d33",
+          confirmButtonText: language === 'he' ? "אישור" : "OK",
           allowOutsideClick: false,
           willOpen: () => {
             setShowContactModal(false);
@@ -345,10 +411,13 @@ export default function PizzaBuilder() {
       setShowContactModal(false);
 
       await Swal.fire({
-        title: "Success!",
-        text: "Your order has been placed successfully. You will receive updates via SMS.",
+        title: language === 'he' ? "הצלחה!" : "Success!",
+        text: language === 'he' 
+          ? "ההזמנה שלך התקבלה בהצלחה. תקבל עדכונים באמצעות SMS" 
+          : "Your order has been placed successfully. You will receive updates via SMS.",
         icon: "success",
         confirmButtonColor: "#3085d6",
+        confirmButtonText: language === 'he' ? "אישור" : "OK",
       });
 
       // Clear form
@@ -360,10 +429,13 @@ export default function PizzaBuilder() {
     } catch (error) {
       console.error("Error adding order:", error);
       await Swal.fire({
-        title: "Error",
-        text: "Failed to place order. Please try again.",
+        title: language === 'he' ? "שגיאה" : "Error",
+        text: language === 'he' 
+          ? "ההזמנה נכשלה. אנא נסה שוב" 
+          : "Failed to place order. Please try again.",
         icon: "error",
         confirmButtonColor: "#d33",
+        confirmButtonText: language === 'he' ? "אישור" : "OK",
       });
     } finally {
       setIsLoading(false);
@@ -434,45 +506,48 @@ export default function PizzaBuilder() {
       const orderDetails = await processAIOrder(aiMessage);
       
       // Set pizza size
-      setPizzaSize(orderDetails.size.toLowerCase());
+      setPizzaSize(orderDetails.size === "large" ? "l" : 
+                  orderDetails.size === "small" ? "s" : "m");
       
-      // Add toppings
-      const newToppings = orderDetails.toppings.map(toppingName => {
-        const topping = toppings.find(t => t.name.toLowerCase() === toppingName.toLowerCase());
+      // Add toppings with their individual placements
+      const newToppings = orderDetails.toppings.map(toppingInfo => {
+        const topping = toppings.find(t => t.name.toLowerCase() === toppingInfo.name.toLowerCase());
         if (!topping) {
-          trackUnavailableToppingRequest(toppingName);
+          trackUnavailableToppingRequest(toppingInfo.name);
           return null;
         }
         return {
           ...topping,
-          placement: orderDetails.placement || 'full',
-          positions: generateToppingPositions(orderDetails.placement || 'full', topping.renderType, topping.name)
+          placement: toppingInfo.placement,  // Use individual placement
+          positions: generateToppingPositions(toppingInfo.placement, topping.renderType, topping.name)
         };
       }).filter(t => t !== null);
 
       setPizzaToppings(newToppings as Topping[]);
-      
-      if (orderDetails.customerName) {
-        setCustomerName(orderDetails.customerName);
-      }
-      if (orderDetails.phoneNumber) {
-        setPhoneNumber(orderDetails.phoneNumber);
-      }
-
       setAIMessage("");
       setShowAIChat(false);
       
+      // Show guidance message instead of contact modal
       await Swal.fire({
-        title: "Success!",
-        text: "AI processed your order",
+        title: language === 'he' ? "ההזמנה נוצרה!" : "Order Created!",
+        text: language === 'he'
+          ? 'הפיצה שלך הותאמה אישית. לחץ על "השלם הזמנה" כדי להמשיך'
+          : "Your pizza has been customized. Click 'Complete Order' when you're ready to proceed.",
         icon: "success",
+        confirmButtonColor: "#3085d6",
+        confirmButtonText: language === 'he' ? "הבנתי!" : "Got it!",
       });
+      
     } catch (error) {
       console.error("Error processing AI chat:", error);
       await Swal.fire({
-        title: "Error",
-        text: "Failed to process AI order",
-        icon: "error",
+        title: language === 'he' ? "תוספת לא זמינה" : "Unavailable Topping",
+        text: language === 'he'
+          ? error instanceof Error ? error.message : "עיבוד ההזמנה נכשל"
+          : error instanceof Error ? error.message : "Failed to process AI order",
+        icon: "warning",
+        confirmButtonColor: "#3085d6",
+        confirmButtonText: language === 'he' ? "אישור" : "OK",
       });
     } finally {
       setIsProcessingAI(false);
@@ -960,6 +1035,9 @@ export default function PizzaBuilder() {
             <DialogTitle className={language === 'he' ? 'text-right' : 'text-left'}>
               {translations[language].contact.title}
             </DialogTitle>
+            <DialogDescription className={language === 'he' ? 'text-right' : 'text-left'}>
+              {translations[language].contact.description}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
