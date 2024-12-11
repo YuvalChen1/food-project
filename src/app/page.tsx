@@ -555,13 +555,22 @@ export default function PizzaBuilder() {
   };
 
   const startListening = () => {
+    // Check if running in a mobile browser
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
       const SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
       const recognition = new SpeechRecognition();
       
       recognition.continuous = false;
       recognition.interimResults = false;
-      recognition.lang = language === 'he' ? 'he-IL' : 'en-US';
+      
+      // Force language based on app language, but allow fallback
+      try {
+        recognition.lang = language === 'he' ? 'he-IL' : 'en-US';
+      } catch (e) {
+        console.warn('Language not supported, falling back to default');
+      }
 
       recognition.onstart = () => {
         setIsListening(true);
@@ -576,15 +585,45 @@ export default function PizzaBuilder() {
       recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
         console.error('Speech recognition error:', event.error);
         setIsListening(false);
+        
+        // Show appropriate error message
+        Swal.fire({
+          title: language === 'he' ? "שגיאת זיהוי קול" : "Voice Recognition Error",
+          text: language === 'he' 
+            ? "לא ניתן להשתמש בזיהוי קול בדפדפן זה. אנא הקלד את הזמנתך"
+            : "Voice recognition is not supported in this browser. Please type your order",
+          icon: "warning",
+          confirmButtonText: language === 'he' ? "הבנתי" : "OK"
+        });
       };
 
       recognition.onend = () => {
         setIsListening(false);
       };
 
-      recognition.start();
+      try {
+        recognition.start();
+      } catch (error) {
+        console.error('Failed to start speech recognition:', error);
+        Swal.fire({
+          title: language === 'he' ? "שגיאה" : "Error",
+          text: language === 'he' 
+            ? "לא ניתן להפעיל זיהוי קול. אנא הקלד את הזמנתך"
+            : "Could not start voice recognition. Please type your order",
+          icon: "error",
+          confirmButtonText: language === 'he' ? "הבנתי" : "OK"
+        });
+      }
     } else {
-      alert('Speech recognition is not supported in this browser.');
+      // Show browser not supported message
+      Swal.fire({
+        title: language === 'he' ? "דפדפן לא נתמך" : "Browser Not Supported",
+        text: language === 'he'
+          ? "זיהוי קול אינו נתמך בדפדפן זה. אנא השתמש בדפדפן עדכני יותר או הקלד את הזמנתך"
+          : "Voice recognition is not supported in this browser. Please use a modern browser or type your order",
+        icon: "warning",
+        confirmButtonText: language === 'he' ? "הבנתי" : "OK"
+      });
     }
   };
 
