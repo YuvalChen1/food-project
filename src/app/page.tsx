@@ -555,49 +555,75 @@ export default function PizzaBuilder() {
   };
 
   const startListening = () => {
-    // Check if running in a mobile browser
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    // Check if running in iOS Safari
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
     
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
       const SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
       const recognition = new SpeechRecognition();
       
-      recognition.continuous = false;
-      recognition.interimResults = false;
-      
-      // Force language based on app language, but allow fallback
-      try {
-        recognition.lang = language === 'he' ? 'he-IL' : 'en-US';
-      } catch (e) {
-        console.warn('Language not supported, falling back to default');
+      // Special handling for iOS
+      if (isIOS && isSafari) {
+        recognition.continuous = true;  // Changed for iOS
+        recognition.interimResults = true;  // Changed for iOS
+      } else {
+        recognition.continuous = false;
+        recognition.interimResults = false;
       }
-
+      
+      // Force language based on app language
+      recognition.lang = language === 'he' ? 'he-IL' : 'en-US';
+      
       recognition.onstart = () => {
         setIsListening(true);
+        console.log('Speech recognition started'); // Debug log
       };
 
-      recognition.onresult = (event: SpeechRecognitionEvent) => {
-        const transcript = event.results[0][0].transcript;
-        setAIMessage(transcript);
-        setIsListening(false);
+      recognition.onresult = (event: any) => {
+        console.log('Speech recognition result received', event);
+        const last = event.results.length - 1;
+        const transcript = event.results[last][0].transcript;
+        
+        if (event.results[last].isFinal) {
+          setAIMessage(transcript);
+          setIsListening(false);
+          recognition.stop();
+        }
       };
 
       recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-        console.error('Speech recognition error:', event.error);
+        console.error('Speech recognition error:', event.error, event); // Debug log
         setIsListening(false);
         
-        // Show appropriate error message
+        let errorMessage = '';
+        switch (event.error) {
+          case 'not-allowed':
+            errorMessage = language === 'he' 
+              ? 'אין הרשאה למיקרופון. אנא אשר גישה בהגדרות הדפדפן'
+              : 'Microphone access denied. Please allow access in browser settings';
+            break;
+          case 'no-speech':
+            errorMessage = language === 'he'
+              ? 'לא זוהה דיבור. אנא נסה שוב'
+              : 'No speech detected. Please try again';
+            break;
+          default:
+            errorMessage = language === 'he'
+              ? 'אירעה שגיאה בזיהוי קול. אנא נסה שוב'
+              : 'Voice recognition error. Please try again';
+        }
+        
         Swal.fire({
           title: language === 'he' ? "שגיאת זיהוי קול" : "Voice Recognition Error",
-          text: language === 'he' 
-            ? "לא ניתן להשתמש בזיהוי קול בדפדפן זה. אנא הקלד את הזמנתך"
-            : "Voice recognition is not supported in this browser. Please type your order",
+          text: errorMessage,
           icon: "warning",
           confirmButtonText: language === 'he' ? "הבנתי" : "OK"
         });
       };
 
       recognition.onend = () => {
+        console.log('Speech recognition ended'); // Debug log
         setIsListening(false);
       };
 
@@ -605,14 +631,7 @@ export default function PizzaBuilder() {
         recognition.start();
       } catch (error) {
         console.error('Failed to start speech recognition:', error);
-        Swal.fire({
-          title: language === 'he' ? "שגיאה" : "Error",
-          text: language === 'he' 
-            ? "לא ניתן להפעיל זיהוי קול. אנא הקלד את הזמנתך"
-            : "Could not start voice recognition. Please type your order",
-          icon: "error",
-          confirmButtonText: language === 'he' ? "הבנתי" : "OK"
-        });
+        setIsListening(false);
       }
     } else {
       // Show browser not supported message
