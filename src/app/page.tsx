@@ -3,7 +3,7 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import { UtensilsCrossed, X, Trash2, Mic, MicOff } from "lucide-react";
+import { UtensilsCrossed, Trash2, Mic, MicOff } from "lucide-react";
 import { toppings, ToppingType } from "@/data/toppings";
 import Swal from "sweetalert2";
 import { addDoc, collection } from "firebase/firestore";
@@ -148,54 +148,6 @@ export default function PizzaBuilder() {
       default:
         return 'none';
     }
-  };
-
-  const generateHalfPositions = (side: string, count: number, toppingName: string) => {
-    const positions: ToppingPosition[] = [];
-    const bufferZone = 0.08;  // Increased buffer from center
-    
-    // Define the valid area for each half
-    const validXRange = side === "left" 
-      ? [0.18, 0.5 - bufferZone]  // Left half range
-      : [0.5 + bufferZone, 0.82]; // Right half range
-      
-    // Create a grid-like pattern with randomization
-    const rows = 5;
-    const itemsPerRow = Math.ceil(count / rows);
-    
-    for (let row = 0; row < rows; row++) {
-      const yPos = 0.25 + (row * 0.5 / rows);  // Distribute vertically
-      
-      for (let col = 0; col < itemsPerRow; col++) {
-        if (positions.length >= count) break;
-        
-        // Calculate base position
-        const xRange = validXRange[1] - validXRange[0];
-        const baseX = validXRange[0] + (col * xRange / itemsPerRow);
-        
-        // Add randomization
-        const randX = baseX + (Math.random() * 0.08 - 0.04);
-        const randY = yPos + (Math.random() * 0.08 - 0.04);
-        
-        // Check if position is valid
-        const dx = randX - 0.5;
-        const dy = randY - 0.5;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        
-        if (distance <= 0.33 && distance >= 0.12) {  // Keep within pizza bounds
-          positions.push({
-            x: randX,
-            y: randY,
-            rotation: Math.random() * 360,
-            clipPath: toppingName === "Onions" ? generateOnionClipPath() : 
-                     toppingName === "Green peppers" ? generatePepperClipPath() :
-                     undefined
-          });
-        }
-      }
-    }
-    
-    return positions;
   };
 
   const generateToppingPositions = useCallback(
@@ -490,14 +442,6 @@ export default function PizzaBuilder() {
     ));
   }, []);
 
-  const removeTopping = (toppingId: number) => {
-    const topping = pizzaToppings.find((t) => t.id === toppingId);
-    if (topping?.name === "Extra cheese") {
-      setHasExtraCheese(false);
-    }
-    setPizzaToppings(pizzaToppings.filter((t) => t.id !== toppingId));
-  };
-
   const handleAIChat = async () => {
     if (!aiMessage.trim()) return;
 
@@ -531,7 +475,7 @@ export default function PizzaBuilder() {
       await Swal.fire({
         title: language === 'he' ? "ההזמנה נוצרה!" : "Order Created!",
         text: language === 'he'
-          ? 'הפיצה לך הותאמה אישית. לחץ על "השלם הזמנה" כדי להמשיך'
+          ? 'הפיצה יך הותאמה אישית. לחץ על "השלם הזמנה" כדי להמשיך'
           : "Your pizza has been customized. Click 'Complete Order' when you're ready to proceed.",
         icon: "success",
         confirmButtonColor: "#3085d6",
@@ -577,8 +521,9 @@ export default function PizzaBuilder() {
         setTimeout(() => {
           try {
             recognition.start();
-            // Force focus on input to ensure keyboard doesn't appear
-            document.activeElement instanceof HTMLElement && document.activeElement.blur();
+            if (document.activeElement instanceof HTMLElement) {
+              document.activeElement.blur();
+            }
           } catch (error) {
             console.error('iOS start error:', error);
             setIsListening(false);

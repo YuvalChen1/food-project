@@ -8,7 +8,7 @@ interface ToppingWithPlacement {
   placement: string;
 }
 
-interface AIOrderResponse {
+export interface AIOrderResponse {
   size: string;
   toppings: ToppingWithPlacement[];
   customerName?: string;
