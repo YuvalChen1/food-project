@@ -58,41 +58,34 @@ export const trackUnavailableToppingRequest = async (toppingName: string) => {
   }
 };
 
-export async function analyzeTrends(): Promise<TrendAnalysis[]> {
+export const analyzeTrends = async () => {
   try {
     const requestsRef = collection(db, "toppingRequests");
     const querySnapshot = await getDocs(requestsRef);
-    const trends: TrendAnalysis[] = [];
-
-    querySnapshot.forEach((doc) => {
-      const data = doc.data() as ToppingRequest;
-      const timespan = new Date().getTime() - data.firstRequested.getTime();
-      const daysActive = timespan / (1000 * 60 * 60 * 24);
-      const requestsPerDay = data.count / daysActive;
-
-      let recommendation = "";
-      if (requestsPerDay >= 0.5 && data.count >= 15) {
-        recommendation = "Highly recommended to add to menu";
-      } else if (requestsPerDay >= 0.2 && data.count >= 8) {
-        recommendation = "Consider adding to menu";
-      } else {
-        recommendation = "Monitor demand";
-      }
-
-      trends.push({
+    
+    const trendsData = querySnapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
         toppingName: data.toppingName,
-        popularity: requestsPerDay,
-        timespan: daysActive,
-        recommendation
-      });
+        count: data.count,
+        // Convert Firestore timestamps to Date objects
+        firstRequested: data.firstRequested?.toDate() || new Date(),
+        lastRequested: data.lastRequested?.toDate() || new Date()
+      };
     });
 
-    return trends;
+    // Rest of your analysis logic...
+    return trendsData.map(data => ({
+      toppingName: data.toppingName,
+      popularity: data.count / ((new Date().getTime() - data.firstRequested.getTime()) / (1000 * 60 * 60 * 24)),
+      timespan: (data.lastRequested.getTime() - data.firstRequested.getTime()) / (1000 * 60 * 60 * 24),
+      recommendation: "Consider adding to menu"
+    }));
   } catch (error) {
-    console.error("Error analyzing trends:", error);
-    throw error;
+    console.error("Error in analyzeTrends:", error);
+    return [];
   }
-}
+};
 
 export const trackToppingUsage = async (toppingName: string, placement: string) => {
   try {

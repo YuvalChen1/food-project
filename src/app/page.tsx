@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { UtensilsCrossed, Trash2, Mic, MicOff } from "lucide-react";
 import { toppings, ToppingType } from "@/data/toppings";
 import Swal from "sweetalert2";
-import { addDoc, collection } from "firebase/firestore";
+import { addDoc, collection, query, orderBy, limit, getDocs } from "firebase/firestore";
 import { db } from "@/firebase/config";
 import {
   Dialog,
@@ -40,11 +40,12 @@ const sizePrices: Record<string, number> = {
 };
 
 interface OrderData {
+  serialNumber?: number;
   size: string;
   toppings: any[];
   totalPrice: number;
   timestamp: Date;
-  status: "pending";
+  status: "pending" | "completed" | "cancelled";
   customerName: string;
   phoneNumber: string;
 }
@@ -68,6 +69,7 @@ export default function PizzaBuilder() {
   const [isListening, setIsListening] = useState(false);
   const [language, setLanguage] = useState<Language>('he');
   const [activeToppingForPlacement, setActiveToppingForPlacement] = useState<Topping | null>(null);
+  const pizzaSectionRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const preventDefault = (e: Event) => e.preventDefault();
@@ -83,6 +85,34 @@ export default function PizzaBuilder() {
       document.removeEventListener("gesturechange", preventDefault);
       document.removeEventListener("gestureend", preventDefault);
     };
+  }, []);
+
+  useEffect(() => {
+    if (window.innerWidth < 640) { // 640px is the 'sm' breakpoint in Tailwind
+      window.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (window.innerWidth < 640 && pizzaSectionRef.current) {
+      pizzaSectionRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleResize = () => {
+      // Force a re-render when window is resized
+      setPizzaToppings(prev => [...prev]);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   const handleToppingClick = (topping: Topping) => {
@@ -326,26 +356,18 @@ export default function PizzaBuilder() {
     try {
       setIsLoading(true);
 
-      // Validate contact details
-      if (!customerName.trim() || !phoneNumber.trim()) {
-        await Swal.fire({
-          title: language === 'he' ? "מידע חסר" : "Missing Information",
-          text: language === 'he' ? "אנא הזן שם ומספר טלפון" : "Please provide your name and phone number",
-          icon: "error",
-          confirmButtonColor: "#d33",
-          confirmButtonText: language === 'he' ? "אישור" : "OK",
-          allowOutsideClick: false,
-          willOpen: () => {
-            setShowContactModal(false);
-          },
-          willClose: () => {
-            setShowContactModal(true);
-          }
-        });
-        return;
-      }
+      // Get the latest serial number
+      const ordersRef = collection(db, "orders");
+      const q = query(ordersRef, orderBy("serialNumber", "desc"), limit(1));
+      const querySnapshot = await getDocs(q);
+      
+      let latestSerialNumber = 0;
+      querySnapshot.forEach((doc) => {
+        latestSerialNumber = doc.data().serialNumber || 0;
+      });
 
       const orderData: OrderData = {
+        serialNumber: latestSerialNumber + 1,
         size: pizzaSize.toUpperCase(),
         toppings: pizzaToppings.map((t) => ({
           name: t.name,
@@ -407,12 +429,22 @@ export default function PizzaBuilder() {
           left: `${pos.x * 100}%`,
           top: `${pos.y * 100}%`,
           transform: `translate(-50%, -50%) rotate(${pos.rotation}deg) scale(${
-            topping.name === "Black olives" ? 0.5 : 
-            topping.name === "Onions" ? 0.8 :
-            topping.name === "Mushrooms" ? 0.7 :
-            topping.name === "Green peppers" ? 0.85 : 
-            topping.name === "Tomatoes" ? 1.6 : 
-            0.85
+            // Base scale factor depending on screen size
+            (window.innerWidth < 375 ? 0.6 : 
+             window.innerWidth < 640 ? 0.7 : 
+             window.innerWidth < 768 ? 0.8 : 
+             0.85) *
+            // Additional scaling based on pizza size
+            (pizzaSize === "s" ? 0.8 :
+             pizzaSize === "m" ? 0.9 :
+             1) *
+            // Individual topping scaling
+            (topping.name === "Black olives" ? 0.4 : 
+             topping.name === "Onions" ? 0.7 :
+             topping.name === "Mushrooms" ? 0.6 :
+             topping.name === "Green peppers" ? 0.75 : 
+             topping.name === "Tomatoes" ? 1.2 : 
+             0.75)
           })`,
           width: "40px",
           height: "40px",
@@ -440,7 +472,7 @@ export default function PizzaBuilder() {
         </div>
       </div>
     ));
-  }, []);
+  }, [pizzaSize]);
 
   const handleAIChat = async () => {
     if (!aiMessage.trim()) return;
@@ -591,14 +623,7 @@ export default function PizzaBuilder() {
   };
 
   const getToppingTranslation = (name: string) => {
-    const key = name.toLowerCase()
-      .split(' ')
-      .map((word, index) => 
-        index === 0 ? word : word.charAt(0).toUpperCase() + word.slice(1)
-      )
-      .join('') as keyof typeof translations.en.toppingNames;
-    
-    return translations[language].toppingNames[key] || name;
+    return translations[language].toppingNames[name as keyof typeof translations.en.toppingNames] || name;
   };
 
   // Helper function for price conversion
@@ -681,20 +706,20 @@ export default function PizzaBuilder() {
         </div>
       </header>
 
-      <main className="flex-1 container mx-auto px-4 py-4">
-        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 mt-2 text-center whitespace-nowrap">
+      <main className="flex-1 container mx-auto px-2 xs:px-4 py-2 xs:py-4">
+        <h1 className="text-xl xs:text-2xl sm:text-3xl md:text-4xl font-bold mb-1 xs:mb-2 sm:mb-4 mt-1 sm:mt-2 text-center whitespace-nowrap">
           {translations[language].buildPizza}
         </h1>
 
-        <div className="flex flex-col lg:flex-row gap-8 mb-8">
+        <div ref={pizzaSectionRef} className="flex flex-col lg:flex-row gap-2 xs:gap-4 sm:gap-8 mb-2 xs:mb-4 sm:mb-8">
           <div className="flex-1 flex flex-col items-center">
-            <div className="relative w-full max-w-md">
+            <div className="relative w-full max-w-[240px] xs:max-w-[280px] sm:max-w-[350px] md:max-w-md">
               {pizzaToppings.length > 0 && (
                 <Button
                   onClick={handleClear}
                   variant="ghost"
                   size="icon"
-                  className="absolute right-[-30px] top-[25%] -translate-y-1/2 hover:bg-red-100 hover:text-red-600 transition-colors w-20 h-20 z-10 !p-0"
+                  className="absolute right-[-20px] xs:right-[-30px] top-[25%] -translate-y-1/2 hover:bg-red-100 hover:text-red-600 transition-colors w-12 h-12 xs:w-16 xs:h-16 sm:w-20 sm:h-20 z-10 !p-0"
                   title="Clear all toppings"
                   style={{
                     minWidth: "unset",
@@ -707,7 +732,7 @@ export default function PizzaBuilder() {
                     style={{
                       width: "100%",
                       height: "100%",
-                      padding: "1.6rem",
+                      padding: "1rem",
                     }}
                   />
                 </Button>
@@ -718,10 +743,10 @@ export default function PizzaBuilder() {
                   ref={pizzaRef}
                   className={`absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 rounded-full transition-all duration-300 overflow-hidden ${
                     pizzaSize === "s"
-                      ? "w-3/4 h-3/4"
+                      ? "w-[60%] h-[60%] sm:w-3/4 sm:h-3/4"
                       : pizzaSize === "m"
-                      ? "w-5/6 h-5/6"
-                      : "w-full h-full"
+                      ? "w-[70%] h-[70%] sm:w-5/6 sm:h-5/6"
+                      : "w-[80%] h-[80%] sm:w-[90%] sm:h-[90%]"
                   }`}
                 >
                   <div className="relative w-full h-full">
@@ -765,7 +790,7 @@ export default function PizzaBuilder() {
               </div>
             </div>
 
-            <div className="flex justify-center mt-4 space-x-4">
+            <div className="flex justify-center mt-1 xs:mt-2 sm:mt-4 space-x-1 xs:space-x-2 sm:space-x-4">
               <Button
                 onClick={() => setPizzaSize("s")}
                 variant={pizzaSize === "s" ? "default" : "outline"}
@@ -788,11 +813,11 @@ export default function PizzaBuilder() {
           </div>
 
           <div className="flex-1">
-            <div className="lg:mt-[30px]">
-              <h2 className="text-2xl font-bold mb-4 text-center lg:text-center">
+            <div className="mt-1 xs:mt-2 lg:mt-[30px]">
+              <h2 className="text-lg xs:text-xl sm:text-2xl font-bold mb-1 xs:mb-2 sm:mb-4 text-center lg:text-center">
                 {translations[language].toppings}
               </h2>
-              <div className="grid grid-cols-4 sm:grid-cols-5 lg:grid-cols-2 xl:grid-cols-3 gap-2 sm:gap-4">
+              <div className="grid grid-cols-4 sm:grid-cols-5 lg:grid-cols-2 xl:grid-cols-3 gap-[2px] xs:gap-1 sm:gap-4">
                 {toppings.map((topping) => (
                   <div
                     key={topping.name}
@@ -835,9 +860,9 @@ export default function PizzaBuilder() {
                       </div>
                     )}
                     
-                    <div className={`relative p-2 sm:p-3 flex flex-col items-center transform transition-transform hover:scale-105 ${
+                    <div className={`relative p-[2px] xs:p-1 sm:p-3 flex flex-col items-center transform transition-transform hover:scale-105 ${
                       pizzaToppings.some(t => t.name === topping.name) ? 
-                      'ring-2 ring-blue-500 ring-offset-2 sm:ring-offset-4 rounded-full bg-blue-50' : ''
+                      'ring-1 xs:ring-2 ring-blue-500 ring-offset-1 xs:ring-offset-2 rounded-full bg-blue-50' : ''
                     }`}
                     >
                       {/* Add placement indicator */}
@@ -859,7 +884,7 @@ export default function PizzaBuilder() {
                       
                       {/* Metal bowl container */}
                       <div
-                        className={`relative w-[85%] aspect-square rounded-full min-w-[45px] sm:min-w-[50px] max-w-[70px] sm:max-w-[80px] lg:max-w-[85px] mx-auto ${
+                        className={`relative w-[80%] aspect-square rounded-full min-w-[25px] xs:min-w-[30px] sm:min-w-[45px] max-w-[35px] xs:max-w-[40px] sm:max-w-[65px] lg:max-w-[75px] mx-auto ${
                           pizzaToppings.some(t => t.name === topping.name) ? 'scale-95' : ''
                         }`}
                         style={{
@@ -920,11 +945,11 @@ export default function PizzaBuilder() {
                       </div>
 
                       {/* Labels */}
-                      <div className="mt-2 text-center">
-                        <p className="text-[11px] sm:text-xs font-medium text-gray-700">
+                      <div className="mt-[1px] xs:mt-0.5 sm:mt-2 text-center">
+                        <p className="text-[7px] xs:text-[8px] sm:text-xs font-medium text-gray-700">
                           {getToppingTranslation(topping.name)}
                         </p>
-                        <p className="text-[10px] sm:text-xs text-gray-500">
+                        <p className="text-[6px] xs:text-[7px] sm:text-xs text-gray-500">
                           {formatPrice(topping.price)}
                         </p>
                       </div>
@@ -1052,6 +1077,7 @@ export default function PizzaBuilder() {
                 onChange={(e) => setCustomerName(e.target.value)}
                 className={`w-full p-2 border rounded-md ${language === 'he' ? 'text-right' : 'text-left'}`}
                 placeholder={translations[language].contact.namePlaceholder}
+                maxLength={15}
                 required
               />
             </div>
@@ -1065,6 +1091,7 @@ export default function PizzaBuilder() {
                 onChange={(e) => setPhoneNumber(e.target.value)}
                 className={`w-full p-2 border rounded-md ${language === 'he' ? 'text-right' : 'text-left'}`}
                 placeholder={translations[language].contact.phonePlaceholder}
+                maxLength={10}
                 required
               />
             </div>

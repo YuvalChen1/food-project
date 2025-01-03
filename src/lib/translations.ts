@@ -36,21 +36,52 @@ export const translations = {
       processing: "Processing..."
     },
     toppingNames: {
-      extraCheese: "Extra cheese",
-      pepperoni: "Pepperoni",
-      mushrooms: "Mushrooms",
-      onions: "Onions",
-      olives: "Olives",
-      bacon: "Bacon",
-      sausage: "Sausage",
-      blackOlives: "Black olives",
-      greenPeppers: "Green peppers",
-      tomatoes: "Tomatoes",
-      // add any other missing toppings...
+      "Extra cheese": "Extra cheese",
+      "Pepperoni": "Pepperoni",
+      "Mushrooms": "Mushrooms",
+      "Onions": "Onions",
+      "Black olives": "Black olives",
+      "Green peppers": "Green peppers",
+      "Tomatoes": "Tomatoes",
+      "Olives": "Olives",
+      "Bacon": "Bacon",
+      "Sausage": "Sausage",
+      "Pineapple": "Pineapple"
     },
     currency: {
       symbol: '$',
       rate: 1
+    },
+    orderStatus: {
+      pending: "Pending",
+      completed: "Completed",
+      cancelled: "Cancelled"
+    },
+    dashboard: {
+      title: "Staff Dashboard",
+      logout: "Logout",
+      labels: {
+        customer: "Customer",
+        size: "Size",
+        total: "Total",
+        toppings: "Toppings",
+        time: "Time",
+        status: "Status",
+        actions: "Actions",
+        noToppings: "No Toppings"
+      },
+      actions: {
+        prepare: "Prepare",
+        ready: "Ready",
+        complete: "Complete"
+      },
+      trends: {
+        popularity: "Popularity",
+        activeDays: "Active for",
+        requestsPerDay: "requests/day",
+        days: "days",
+        recommendation: "Consider adding to menu"
+      }
     }
   },
   he: {
@@ -58,9 +89,12 @@ export const translations = {
     buildPizza: "בנה את הפיצה המושלמת שלך",
     toppings: "תוספות",
     sizes: {
-      small: "S",
-      medium: "M",
-      large: "L"
+      small: "קטן",
+      medium: "בינוני",
+      large: "גדול",
+      s: "קטן",
+      m: "בינוני",
+      l: "גדול"
     },
     placement: {
       full: "מלא",
@@ -90,21 +124,54 @@ export const translations = {
       processing: "מעבד..."
     },
     toppingNames: {
-      extraCheese: "תוספת גבינה",
-      pepperoni: "פפרוני",
-      mushrooms: "פטריות",
-      onions: "בצל",
-      olives: "זיתים",
-      bacon: "בייקון",
-      sausage: "נקניקיות",
-      blackOlives: "זיתים שחורים",
-      greenPeppers: "פלפל ירוק",
-      tomatoes: "עגבניות",
-      // add any other missing toppings...
+      "Extra cheese": "תוספת גבינה",
+      "Pepperoni": "פפרוני",
+      "Mushrooms": "פטריות",
+      "Onions": "בצל",
+      "Black olives": "זיתים שחורים",
+      "Green peppers": "פלפל ירוק",
+      "Tomatoes": "עגבניות",
+      "Olives": "זיתים",
+      "Bacon": "בייקון",
+      "Sausage": "נקניקיות",
+      "Pineapple": "אננס"
     },
     currency: {
       symbol: '₪',
       rate: 3.7
+    },
+    orderStatus: {
+      pending: "ממתין",
+      preparing: "בהכנה",
+      ready: "מוכן",
+      completed: "הושלם",
+      cancelled: "בוטל"
+    },
+    dashboard: {
+      title: "לוח בקרה",
+      logout: "התנתק",
+      labels: {
+        customer: "לקוח",
+        size: "גודל",
+        total: "סה״כ",
+        toppings: "תוספות",
+        time: "זמן",
+        status: "סטטוס",
+        actions: "פעולות",
+        noToppings: "ללא תוספות"
+      },
+      actions: {
+        prepare: "התחל הכנה",
+        ready: "מוכן לאיסוף",
+        complete: "השלם הזמנה"
+      },
+      trends: {
+        popularity: "פופולריות",
+        activeDays: "פעיל במשך",
+        requestsPerDay: "בקשות ליום",
+        days: "ימים",
+        recommendation: "שקול להוסיף לתפריט"
+      }
     }
   }
 };
