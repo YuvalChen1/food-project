@@ -552,13 +552,13 @@ export default function PizzaBuilder() {
         recognition.interimResults = false;
         recognition.maxAlternatives = 1;
         
-        // Set language with region code
+        // Set language with region code for iOS
         recognition.lang = language === 'he' ? 'he-IL' : 'en-US';
         
-        // Longer timeout for Hebrew
-        const startDelay = language === 'he' ? 800 : 500;
+        // Add debug logging
+        console.log('Starting recognition in:', recognition.lang);
         
-        // Clear any existing handlers
+        // Clear any existing handlers before setting new ones
         recognition.onstart = null;
         recognition.onresult = null;
         recognition.onerror = null;
@@ -615,7 +615,7 @@ export default function PizzaBuilder() {
             console.error('Start error:', error);
             setIsListening(false);
           }
-        }, language === 'he' ? 800 : 500);
+        }, language === 'he' ? 800 : 500); // Longer delay for Hebrew
       } else {
         recognition.start();
       }
