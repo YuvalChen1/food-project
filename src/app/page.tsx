@@ -542,13 +542,22 @@ export default function PizzaBuilder() {
       if (isIOS && isSafari) {
         recognition.continuous = false;
         recognition.interimResults = false;
-        recognition.maxAlternatives = 3; // Increased alternatives for better recognition
         
-        // Try just 'he' instead of 'he-IL'
-        recognition.lang = language === 'he' ? 'he' : 'en-US';
+        // Key changes for iOS Hebrew support
+        recognition.maxAlternatives = 5; // Increase alternatives for better recognition
+        recognition.lang = language === 'he' ? 'he-IL' : 'en-US'; // Explicitly use he-IL
         
-        // Debug logging
-        console.log('iOS Safari detected, using language:', recognition.lang);
+        // Show feedback when starting recognition
+        Swal.fire({
+          title: language === 'he' ? "מקליט..." : "Recording...",
+          text: language === 'he' ? "אנא דבר עכשיו" : "Please speak now",
+          timer: 4000,
+          timerProgressBar: true,
+          showConfirmButton: false,
+          position: 'top',
+          backdrop: false,
+          toast: true
+        });
       } else {
         recognition.continuous = false;
         recognition.interimResults = false;
@@ -558,50 +567,42 @@ export default function PizzaBuilder() {
       recognition.onstart = () => {
         setIsListening(true);
         console.log('Recognition started with language:', recognition.lang);
-        
-        // Show feedback to user
-        if (isIOS && language === 'he') {
-          Swal.fire({
-            title: "מקליט",
-            text: "אנא דבר עכשיו",
-            timer: 2000,
-            showConfirmButton: false,
-            position: 'top',
-            backdrop: false,
-            toast: true
-          });
-        }
       };
-
+  
       recognition.onresult = (event: any) => {
+        let finalTranscript = '';
+        let maxConfidence = 0;
+        
+        // Check all alternatives for the best result
         if (event.results && event.results[0]) {
-          const transcript = event.results[0][0].transcript;
-          const confidence = event.results[0][0].confidence;
-
-          console.log('Transcript received:', transcript);
-          console.log('Confidence level:', confidence);
-
-          // Check if the confidence level is above a certain threshold
-          if (confidence > 0.5) { // You can adjust this threshold
-            setAIMessage(transcript);
+          for (let i = 0; i < event.results[0].length; i++) {
+            const transcript = event.results[0][i].transcript;
+            const confidence = event.results[0][i].confidence;
+            
+            if (confidence > maxConfidence) {
+              maxConfidence = confidence;
+              finalTranscript = transcript;
+            }
+          }
+          
+          // Use the best result if confidence is acceptable
+          if (maxConfidence > 0.4) { // Lower threshold for Hebrew on iOS
+            setAIMessage(finalTranscript);
           } else {
-            console.warn('Low confidence in recognition:', confidence);
+            console.warn('Low confidence in recognition:', maxConfidence);
             Swal.fire({
               title: language === 'he' ? "שגיאה" : "Error",
-              text: language === 'he' ? "לא הצלחנו להבין את מה שאמרת." : "We couldn't understand what you said.",
+              text: language === 'he' ? "לא הצלחנו להבין את מה שאמרת. נסה שוב" : "We couldn't understand what you said. Please try again.",
               icon: "warning",
               confirmButtonText: language === 'he' ? "הבנתי" : "OK"
             });
           }
-        } else {
-          console.warn('No results received from recognition.');
         }
         setIsListening(false);
       };
-
+  
       recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
         console.error('Recognition error:', event.error);
-        console.error('Error details:', event);
         setIsListening(false);
         
         if (event.error !== 'aborted') {
@@ -610,10 +611,11 @@ export default function PizzaBuilder() {
               title: "שגיאת זיהוי קול",
               html: `
                 <p>אנא ודא:</p>
-                <ul style="text-align: right; list-style-type: none;">
+                <ul style="text-align: right; list-style-type: none; padding: 0;">
                   <li>1. שהרשאת מיקרופון מאופשרת</li>
-                  <li>2. שעברית מותקנת במכשיר</li>
-                  <li>3. שאתה מדבר ברור למיקרופון</li>
+                  <li>2. שעברית מותקנת כשפת מערכת במכשיר</li>
+                  <li>3. שהמכשיר מוגדר לעברית כשפת ברירת מחדל</li>
+                  <li>4. שאתה מדבר ברור וקרוב למיקרופון</li>
                 </ul>
               `,
               icon: "warning",
@@ -622,20 +624,20 @@ export default function PizzaBuilder() {
           } else {
             Swal.fire({
               title: "Voice Recognition Error",
-              text: 'Please try again or type your order',
+              text: "Please try again or type your order",
               icon: "warning",
               confirmButtonText: "OK"
             });
           }
         }
       };
-
+  
       recognition.onend = () => {
         console.log('Recognition ended');
         setIsListening(false);
       };
-
-      // Start with longer delay for iOS Hebrew
+  
+      // Add delay before starting recognition on iOS
       if (isIOS && language === 'he') {
         setTimeout(() => {
           try {
@@ -644,7 +646,7 @@ export default function PizzaBuilder() {
             console.error('Start error:', error);
             setIsListening(false);
           }
-        }, 1200); // Increased delay for Hebrew
+        }, 1000);
       } else {
         try {
           recognition.start();
