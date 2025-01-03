@@ -576,9 +576,25 @@ export default function PizzaBuilder() {
       recognition.onresult = (event: any) => {
         if (event.results && event.results[0]) {
           const transcript = event.results[0][0].transcript;
+          const confidence = event.results[0][0].confidence;
+
           console.log('Transcript received:', transcript);
-          console.log('Confidence:', event.results[0][0].confidence);
-          setAIMessage(transcript);
+          console.log('Confidence level:', confidence);
+
+          // Check if the confidence level is above a certain threshold
+          if (confidence > 0.5) { // You can adjust this threshold
+            setAIMessage(transcript);
+          } else {
+            console.warn('Low confidence in recognition:', confidence);
+            Swal.fire({
+              title: language === 'he' ? "שגיאה" : "Error",
+              text: language === 'he' ? "לא הצלחנו להבין את מה שאמרת." : "We couldn't understand what you said.",
+              icon: "warning",
+              confirmButtonText: language === 'he' ? "הבנתי" : "OK"
+            });
+          }
+        } else {
+          console.warn('No results received from recognition.');
         }
         setIsListening(false);
       };
