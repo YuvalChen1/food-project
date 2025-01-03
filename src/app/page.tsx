@@ -538,16 +538,38 @@ export default function PizzaBuilder() {
       const SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
       const recognition = new SpeechRecognition();
       
+      // Show initial feedback
+      Swal.fire({
+        title: language === 'he' ? "מתחיל הקלטה..." : "Starting...",
+        text: language === 'he' ? "מאתחל זיהוי קולי" : "Initializing voice recognition",
+        timer: 2000,
+        timerProgressBar: true,
+        showConfirmButton: false,
+        position: 'top',
+        backdrop: false,
+        toast: true
+      });
+  
       // iOS Safari specific settings
-      if (isIOS && isSafari) {
+      if (isIOS) {
         recognition.continuous = false;
         recognition.interimResults = false;
+        recognition.maxAlternatives = 10; // Increase alternatives for better Hebrew recognition
         
-        // Key changes for iOS Hebrew support
-        recognition.maxAlternatives = 5; // Increase alternatives for better recognition
-        recognition.lang = language === 'he' ? 'he-IL' : 'en-US'; // Explicitly use he-IL
+        // Force Hebrew language code format that works better on iOS
+        recognition.lang = language === 'he' ? 'he' : 'en-US';
         
-        // Show feedback when starting recognition
+        // Show iOS specific feedback
+        console.log('iOS detected, using lang:', recognition.lang);
+      } else {
+        recognition.continuous = false;
+        recognition.interimResults = true;
+        recognition.lang = language === 'he' ? 'he-IL' : 'en-US';
+      }
+      
+      recognition.onstart = () => {
+        setIsListening(true);
+        // Show active recording feedback
         Swal.fire({
           title: language === 'he' ? "מקליט..." : "Recording...",
           text: language === 'he' ? "אנא דבר עכשיו" : "Please speak now",
@@ -558,26 +580,21 @@ export default function PizzaBuilder() {
           backdrop: false,
           toast: true
         });
-      } else {
-        recognition.continuous = false;
-        recognition.interimResults = false;
-        recognition.lang = language === 'he' ? 'he-IL' : 'en-US';
-      }
-      
-      recognition.onstart = () => {
-        setIsListening(true);
-        console.log('Recognition started with language:', recognition.lang);
       };
   
       recognition.onresult = (event: any) => {
         let finalTranscript = '';
         let maxConfidence = 0;
         
-        // Check all alternatives for the best result
+        // Debug log the results
+        console.log('Recognition results:', event.results);
+        
         if (event.results && event.results[0]) {
+          // Log all alternatives
           for (let i = 0; i < event.results[0].length; i++) {
             const transcript = event.results[0][i].transcript;
             const confidence = event.results[0][i].confidence;
+            console.log(`Alternative ${i}:`, transcript, 'Confidence:', confidence);
             
             if (confidence > maxConfidence) {
               maxConfidence = confidence;
@@ -585,16 +602,31 @@ export default function PizzaBuilder() {
             }
           }
           
-          // Use the best result if confidence is acceptable
-          if (maxConfidence > 0.4) { // Lower threshold for Hebrew on iOS
+          // Lower confidence threshold for Hebrew
+          const minConfidence = language === 'he' ? 0.3 : 0.4;
+          
+          if (maxConfidence > minConfidence) {
             setAIMessage(finalTranscript);
-          } else {
-            console.warn('Low confidence in recognition:', maxConfidence);
+            // Show success feedback
             Swal.fire({
-              title: language === 'he' ? "שגיאה" : "Error",
-              text: language === 'he' ? "לא הצלחנו להבין את מה שאמרת. נסה שוב" : "We couldn't understand what you said. Please try again.",
+              title: language === 'he' ? "זוהה בהצלחה" : "Recognition Successful",
+              text: finalTranscript,
+              timer: 2000,
+              icon: 'success',
+              position: 'top',
+              backdrop: false,
+              toast: true
+            });
+          } else {
+            console.warn('Low confidence:', maxConfidence);
+            Swal.fire({
+              title: language === 'he' ? "לא הצלחנו להבין" : "Couldn't Understand",
+              text: language === 'he' ? "נסה לדבר שוב, ברור יותר" : "Please try speaking more clearly",
               icon: "warning",
-              confirmButtonText: language === 'he' ? "הבנתי" : "OK"
+              timer: 3000,
+              position: 'top',
+              backdrop: false,
+              toast: true
             });
           }
         }
@@ -602,34 +634,19 @@ export default function PizzaBuilder() {
       };
   
       recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-        console.error('Recognition error:', event.error);
+        console.error('Recognition error:', event.error, event);
         setIsListening(false);
         
-        if (event.error !== 'aborted') {
-          if (isIOS && language === 'he') {
-            Swal.fire({
-              title: "שגיאת זיהוי קול",
-              html: `
-                <p>אנא ודא:</p>
-                <ul style="text-align: right; list-style-type: none; padding: 0;">
-                  <li>1. שהרשאת מיקרופון מאופשרת</li>
-                  <li>2. שעברית מותקנת כשפת מערכת במכשיר</li>
-                  <li>3. שהמכשיר מוגדר לעברית כשפת ברירת מחדל</li>
-                  <li>4. שאתה מדבר ברור וקרוב למיקרופון</li>
-                </ul>
-              `,
-              icon: "warning",
-              confirmButtonText: "הבנתי"
-            });
-          } else {
-            Swal.fire({
-              title: "Voice Recognition Error",
-              text: "Please try again or type your order",
-              icon: "warning",
-              confirmButtonText: "OK"
-            });
-          }
-        }
+        // Show specific error feedback
+        Swal.fire({
+          title: language === 'he' ? "שגיאה בזיהוי קול" : "Recognition Error",
+          text: `Error: ${event.error}`,
+          icon: "error",
+          timer: 3000,
+          position: 'top',
+          backdrop: false,
+          toast: true
+        });
       };
   
       recognition.onend = () => {
@@ -637,14 +654,23 @@ export default function PizzaBuilder() {
         setIsListening(false);
       };
   
-      // Add delay before starting recognition on iOS
-      if (isIOS && language === 'he') {
+      // Add delay for iOS
+      if (isIOS) {
         setTimeout(() => {
           try {
             recognition.start();
           } catch (error) {
             console.error('Start error:', error);
             setIsListening(false);
+            Swal.fire({
+              title: language === 'he' ? "שגיאת הפעלה" : "Start Error",
+              text: String(error),
+              icon: "error",
+              timer: 3000,
+              position: 'top',
+              backdrop: false,
+              toast: true
+            });
           }
         }, 1000);
       } else {
@@ -658,9 +684,7 @@ export default function PizzaBuilder() {
     } else {
       Swal.fire({
         title: language === 'he' ? "לא נתמך" : "Not Supported",
-        text: language === 'he' 
-          ? "זיהוי קול אינו נתמך בדפדפן זה"
-          : "Voice recognition is not supported in this browser",
+        text: language === 'he' ? "זיהוי קול אינו נתמך בדפדפן זה" : "Voice recognition is not supported in this browser",
         icon: "error",
         confirmButtonText: language === 'he' ? "הבנתי" : "OK"
       });
