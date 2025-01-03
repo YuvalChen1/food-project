@@ -540,31 +540,16 @@ export default function PizzaBuilder() {
       
       // iOS Safari specific settings
       if (isIOS && isSafari) {
-        // Stop any existing instances
-        try {
-          recognition.abort();
-        } catch (e) {
-          console.log('No active recognition to abort');
-        }
-        
-        // Configure for iOS
         recognition.continuous = false;
         recognition.interimResults = false;
-        recognition.maxAlternatives = 1;
+        recognition.maxAlternatives = 3; // Increased alternatives for better recognition
         
-        // Set language with region code for iOS
-        recognition.lang = language === 'he' ? 'he-IL' : 'en-US';
+        // Try just 'he' instead of 'he-IL'
+        recognition.lang = language === 'he' ? 'he' : 'en-US';
         
-        // Add debug logging
-        console.log('Starting recognition in:', recognition.lang);
-        
-        // Clear any existing handlers before setting new ones
-        recognition.onstart = null;
-        recognition.onresult = null;
-        recognition.onerror = null;
-        recognition.onend = null;
+        // Debug logging
+        console.log('iOS Safari detected, using language:', recognition.lang);
       } else {
-        // Desktop settings
         recognition.continuous = false;
         recognition.interimResults = false;
         recognition.lang = language === 'he' ? 'he-IL' : 'en-US';
@@ -572,13 +557,27 @@ export default function PizzaBuilder() {
       
       recognition.onstart = () => {
         setIsListening(true);
-        console.log('Started listening in:', recognition.lang);
+        console.log('Recognition started with language:', recognition.lang);
+        
+        // Show feedback to user
+        if (isIOS && language === 'he') {
+          Swal.fire({
+            title: "מקליט",
+            text: "אנא דבר עכשיו",
+            timer: 2000,
+            showConfirmButton: false,
+            position: 'top',
+            backdrop: false,
+            toast: true
+          });
+        }
       };
 
       recognition.onresult = (event: any) => {
         if (event.results && event.results[0]) {
           const transcript = event.results[0][0].transcript;
-          console.log('Got transcript:', transcript);
+          console.log('Transcript received:', transcript);
+          console.log('Confidence:', event.results[0][0].confidence);
           setAIMessage(transcript);
         }
         setIsListening(false);
@@ -586,18 +585,32 @@ export default function PizzaBuilder() {
 
       recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
         console.error('Recognition error:', event.error);
+        console.error('Error details:', event);
         setIsListening(false);
         
-        // Show error only for actual errors, not cancellations
         if (event.error !== 'aborted') {
-          Swal.fire({
-            title: language === 'he' ? "שגיאת זיהוי קול" : "Voice Recognition Error",
-            text: language === 'he' 
-              ? 'אנא נסה שוב או הקלד את הזמנתך'
-              : 'Please try again or type your order',
-            icon: "warning",
-            confirmButtonText: language === 'he' ? "הבנתי" : "OK"
-          });
+          if (isIOS && language === 'he') {
+            Swal.fire({
+              title: "שגיאת זיהוי קול",
+              html: `
+                <p>אנא ודא:</p>
+                <ul style="text-align: right; list-style-type: none;">
+                  <li>1. שהרשאת מיקרופון מאופשרת</li>
+                  <li>2. שעברית מותקנת במכשיר</li>
+                  <li>3. שאתה מדבר ברור למיקרופון</li>
+                </ul>
+              `,
+              icon: "warning",
+              confirmButtonText: "הבנתי"
+            });
+          } else {
+            Swal.fire({
+              title: "Voice Recognition Error",
+              text: 'Please try again or type your order',
+              icon: "warning",
+              confirmButtonText: "OK"
+            });
+          }
         }
       };
 
@@ -606,8 +619,8 @@ export default function PizzaBuilder() {
         setIsListening(false);
       };
 
-      // Start with delay for iOS
-      if (isIOS && isSafari) {
+      // Start with longer delay for iOS Hebrew
+      if (isIOS && language === 'he') {
         setTimeout(() => {
           try {
             recognition.start();
@@ -615,10 +628,24 @@ export default function PizzaBuilder() {
             console.error('Start error:', error);
             setIsListening(false);
           }
-        }, language === 'he' ? 800 : 500); // Longer delay for Hebrew
+        }, 1200); // Increased delay for Hebrew
       } else {
-        recognition.start();
+        try {
+          recognition.start();
+        } catch (error) {
+          console.error('Start error:', error);
+          setIsListening(false);
+        }
       }
+    } else {
+      Swal.fire({
+        title: language === 'he' ? "לא נתמך" : "Not Supported",
+        text: language === 'he' 
+          ? "זיהוי קול אינו נתמך בדפדפן זה"
+          : "Voice recognition is not supported in this browser",
+        icon: "error",
+        confirmButtonText: language === 'he' ? "הבנתי" : "OK"
+      });
     }
   };
 
