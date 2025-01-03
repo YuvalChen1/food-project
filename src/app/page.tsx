@@ -50,6 +50,11 @@ interface OrderData {
   phoneNumber: string;
 }
 
+interface SpeechRecognitionResult {
+  transcript: string;
+  confidence: number;
+}
+
 export default function PizzaBuilder() {
   const [pizzaSize, setPizzaSize] = useState<string>("m");
   const [pizzaToppings, setPizzaToppings] = useState<Topping[]>([]);
@@ -532,7 +537,6 @@ export default function PizzaBuilder() {
 
   const startListening = () => {
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
     
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
       const SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
@@ -550,17 +554,21 @@ export default function PizzaBuilder() {
         toast: true
       });
   
-      // iOS Safari specific settings
+      // iOS specific settings
       if (isIOS) {
         recognition.continuous = false;
         recognition.interimResults = false;
-        recognition.maxAlternatives = 10; // Increase alternatives for better Hebrew recognition
         
-        // Force Hebrew language code format that works better on iOS
-        recognition.lang = language === 'he' ? 'he' : 'en-US';
+        // Critical changes for iOS Hebrew support
+        if (language === 'he') {
+          recognition.lang = 'he-IL'; // Try both formats
+          recognition.maxAlternatives = 5; // Increase alternatives for better recognition
+        } else {
+          recognition.lang = 'en-US';
+        }
         
-        // Show iOS specific feedback
-        console.log('iOS detected, using lang:', recognition.lang);
+        // Add debugging
+        console.log('iOS detected, using language:', recognition.lang);
       } else {
         recognition.continuous = false;
         recognition.interimResults = true;
@@ -584,29 +592,34 @@ export default function PizzaBuilder() {
   
       recognition.onresult = (event: any) => {
         let finalTranscript = '';
-        let maxConfidence = 0;
         
-        // Debug log the results
+        // Debug logging
         console.log('Recognition results:', event.results);
         
         if (event.results && event.results[0]) {
-          // Log all alternatives
-          for (let i = 0; i < event.results[0].length; i++) {
-            const transcript = event.results[0][i].transcript;
-            const confidence = event.results[0][i].confidence;
-            console.log(`Alternative ${i}:`, transcript, 'Confidence:', confidence);
-            
-            if (confidence > maxConfidence) {
-              maxConfidence = confidence;
-              finalTranscript = transcript;
-            }
-          }
+          // For Hebrew on iOS, try to get the best result from alternatives
+          const alternatives = Array.from(event.results[0]);
+          console.log('All alternatives:', alternatives);
           
-          // Lower confidence threshold for Hebrew
+          // Find the best result with highest confidence
+          let bestResult: SpeechRecognitionResult = { transcript: '', confidence: 0 };
+          let highestConfidence = 0;
+          
+          alternatives.forEach((result: any) => {
+            console.log('Alternative:', result.transcript, 'Confidence:', result.confidence);
+            if (result.confidence > highestConfidence) {
+              highestConfidence = result.confidence;
+              bestResult = { transcript: result.transcript, confidence: result.confidence };
+            }
+          });
+  
+          // Use a lower confidence threshold for Hebrew
           const minConfidence = language === 'he' ? 0.3 : 0.4;
           
-          if (maxConfidence > minConfidence) {
+          if (highestConfidence > minConfidence) {
+            finalTranscript = bestResult.transcript;
             setAIMessage(finalTranscript);
+            
             // Show success feedback
             Swal.fire({
               title: language === 'he' ? "זוהה בהצלחה" : "Recognition Successful",
@@ -618,7 +631,7 @@ export default function PizzaBuilder() {
               toast: true
             });
           } else {
-            console.warn('Low confidence:', maxConfidence);
+            console.warn('Low confidence:', highestConfidence);
             Swal.fire({
               title: language === 'he' ? "לא הצלחנו להבין" : "Couldn't Understand",
               text: language === 'he' ? "נסה לדבר שוב, ברור יותר" : "Please try speaking more clearly",
@@ -637,7 +650,6 @@ export default function PizzaBuilder() {
         console.error('Recognition error:', event.error, event);
         setIsListening(false);
         
-        // Show specific error feedback
         Swal.fire({
           title: language === 'he' ? "שגיאה בזיהוי קול" : "Recognition Error",
           text: `Error: ${event.error}`,
@@ -674,12 +686,7 @@ export default function PizzaBuilder() {
           }
         }, 1000);
       } else {
-        try {
-          recognition.start();
-        } catch (error) {
-          console.error('Start error:', error);
-          setIsListening(false);
-        }
+        recognition.start();
       }
     } else {
       Swal.fire({
