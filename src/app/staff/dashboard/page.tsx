@@ -14,11 +14,12 @@ import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import Navigation from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
-import { formatDistanceToNow, format } from "date-fns";
+import { formatDistanceToNow, format, startOfDay, endOfDay, startOfMonth, endOfMonth } from "date-fns";
 import { he } from 'date-fns/locale';
 import { translations } from "@/lib/translations";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { analyzeTrends } from '@/lib/orderAnalysis';
+import * as XLSX from 'xlsx';
 
 interface Order {
   id: string;
@@ -36,6 +37,7 @@ export default function StaffDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [trends, setTrends] = useState<any[]>([]);
   const [isHebrew, setIsHebrew] = useState(true);
+  const [existingPhones, setExistingPhones] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadTrends();
@@ -47,6 +49,16 @@ export default function StaffDashboard() {
         ...(doc.data() as Omit<Order, 'id' | 'timestamp'>),
         timestamp: doc.data().timestamp?.toDate(),
       })) as Order[];
+
+      // Create a set of unique phone numbers that appeared before the current order
+      const phones = new Set<string>();
+      orderData.forEach((order, index) => {
+        const previousOrders = orderData.slice(index + 1);
+        if (previousOrders.some(prevOrder => prevOrder.phoneNumber === order.phoneNumber)) {
+          phones.add(order.phoneNumber);
+        }
+      });
+      setExistingPhones(phones);
 
       setOrders(orderData);
       setIsLoading(false);
@@ -62,6 +74,100 @@ export default function StaffDashboard() {
     } catch (error) {
       console.error("Error loading trends:", error);
     }
+  };
+
+  const isReturningCustomer = (phoneNumber: string) => {
+    return existingPhones.has(phoneNumber);
+  };
+
+  // Convert USD to ILS (1 USD = 3.7 ILS approximately)
+  const usdToIls = (usd: number) => usd * 3.7;
+
+  const formatCurrency = (amount: number, currency: 'USD' | 'ILS') => {
+    return new Intl.NumberFormat('he-IL', {
+      style: 'currency',
+      currency: currency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  };
+
+  const exportDailyData = () => {
+    const today = new Date();
+    const start = startOfDay(today);
+    const end = endOfDay(today);
+    
+    const dailyOrders = orders.filter(order => 
+      order.timestamp >= start && order.timestamp <= end
+    );
+
+    const totalIncomeUSD = dailyOrders.reduce((sum, order) => sum + order.totalPrice, 0);
+    const totalIncomeILS = usdToIls(totalIncomeUSD);
+
+    const dailyData = {
+      date: format(today, 'yyyy-MM-dd'),
+      totalCustomers: dailyOrders.length,
+      totalIncomeUSD: formatCurrency(totalIncomeUSD, 'USD'),
+      totalIncomeILS: formatCurrency(totalIncomeILS, 'ILS'),
+      orders: dailyOrders.map(order => ({
+        customerName: order.customerName,
+        phoneNumber: order.phoneNumber,
+        totalPriceUSD: formatCurrency(order.totalPrice, 'USD'),
+        totalPriceILS: formatCurrency(usdToIls(order.totalPrice), 'ILS'),
+        time: format(order.timestamp, 'HH:mm'),
+        status: order.status,
+        isReturningCustomer: isReturningCustomer(order.phoneNumber)
+      }))
+    };
+
+    const ws = XLSX.utils.json_to_sheet([dailyData]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Daily Report");
+    XLSX.writeFile(wb, `daily_report_${format(today, 'yyyy-MM-dd')}.xlsx`);
+  };
+
+  const exportMonthlyData = () => {
+    const today = new Date();
+    const start = startOfMonth(today);
+    const end = endOfMonth(today);
+    
+    const monthlyOrders = orders.filter(order => 
+      order.timestamp >= start && order.timestamp <= end
+    );
+
+    const totalIncomeUSD = monthlyOrders.reduce((sum, order) => sum + order.totalPrice, 0);
+    const totalIncomeILS = usdToIls(totalIncomeUSD);
+
+    const monthlyData = {
+      month: format(today, 'yyyy-MM'),
+      totalCustomers: monthlyOrders.length,
+      totalIncomeUSD: formatCurrency(totalIncomeUSD, 'USD'),
+      totalIncomeILS: formatCurrency(totalIncomeILS, 'ILS'),
+      dailyBreakdown: Object.entries(monthlyOrders.reduce((acc: any, order) => {
+        const date = format(order.timestamp, 'yyyy-MM-dd');
+        if (!acc[date]) {
+          acc[date] = {
+            customers: 0,
+            incomeUSD: 0,
+            incomeILS: 0
+          };
+        }
+        acc[date].customers++;
+        acc[date].incomeUSD += order.totalPrice;
+        acc[date].incomeILS = usdToIls(acc[date].incomeUSD);
+        return acc;
+      }, {})).map(([date, data]: [string, any]) => ({
+        date,
+        customers: data.customers,
+        incomeUSD: formatCurrency(data.incomeUSD, 'USD'),
+        incomeILS: formatCurrency(data.incomeILS, 'ILS')
+      }))
+    };
+
+    const ws = XLSX.utils.json_to_sheet([monthlyData]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Monthly Report");
+    XLSX.writeFile(wb, `monthly_report_${format(today, 'yyyy-MM')}.xlsx`);
   };
 
   const sendSMSNotification = async (phoneNumber: string, message: string) => {
@@ -140,30 +246,34 @@ export default function StaffDashboard() {
 
   const formatOrderDate = (timestamp: any) => {
     try {
-      // Handle Firestore Timestamp
       if (timestamp && typeof timestamp.toDate === "function") {
-        return formatDistanceToNow(timestamp.toDate(), { addSuffix: true });
+        return formatDistanceToNow(timestamp.toDate(), { 
+          addSuffix: true,
+          locale: isHebrew ? he : undefined
+        });
       }
 
-      // Handle regular date strings
       if (timestamp) {
         const date = new Date(timestamp);
         if (!isNaN(date.getTime())) {
-          return formatDistanceToNow(date, { addSuffix: true });
+          return formatDistanceToNow(date, { 
+            addSuffix: true,
+            locale: isHebrew ? he : undefined
+          });
         }
       }
 
-      return "Invalid date";
+      return isHebrew ? "תאריך לא תקין" : "Invalid date";
     } catch (error) {
       console.error("Date formatting error:", error);
-      return "Invalid date";
+      return isHebrew ? "תאריך לא תקין" : "Invalid date";
     }
   };
 
-  const translateOrder = (order: Order) => {
+  const translateOrder = (order: Order): Order => {
     if (!isHebrew) return order;
 
-    return {
+    const translatedOrder = {
       ...order,
       size: translations.he.sizes[order.size.toLowerCase() as keyof typeof translations.he.sizes] || order.size,
       toppings: order.toppings.map(topping => ({
@@ -171,7 +281,9 @@ export default function StaffDashboard() {
         name: translations.he.toppingNames[topping.name as keyof typeof translations.he.toppingNames] || topping.name
       })),
       status: translations.he.orderStatus[order.status as keyof typeof translations.he.orderStatus] || order.status
-    };
+    } as Order;
+    
+    return translatedOrder;
   };
 
   // Generate a user-friendly order number
@@ -207,8 +319,26 @@ export default function StaffDashboard() {
         />
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex justify-end mb-6">
-            <Button onClick={() => setIsHebrew(!isHebrew)} variant="outline">
+          <div className="flex flex-wrap justify-end items-center mb-4 gap-2">
+            <Button
+              onClick={exportDailyData}
+              variant="outline"
+              className="w-full sm:w-auto bg-green-100 hover:bg-green-200 text-green-700 border-green-300 text-sm whitespace-normal sm:whitespace-nowrap"
+            >
+              {isHebrew ? translations.he.dashboard.exportDaily : translations.en.dashboard.exportDaily}
+            </Button>
+            <Button
+              onClick={exportMonthlyData}
+              variant="outline"
+              className="w-full sm:w-auto bg-green-100 hover:bg-green-200 text-green-700 border-green-300 text-sm whitespace-normal sm:whitespace-nowrap"
+            >
+              {isHebrew ? translations.he.dashboard.exportMonthly : translations.en.dashboard.exportMonthly}
+            </Button>
+            <Button 
+              onClick={() => setIsHebrew(!isHebrew)} 
+              variant="outline"
+              className="bg-blue-100 hover:bg-blue-200 text-blue-700 border-blue-300"
+            >
               {isHebrew ? 'English' : 'עברית'}
             </Button>
           </div>
@@ -220,10 +350,10 @@ export default function StaffDashboard() {
           ) : (
             <Tabs defaultValue="orders" className="w-full" dir={isHebrew ? 'rtl' : 'ltr'}>
               <TabsList className="grid w-full grid-cols-2 mb-8">
-                <TabsTrigger value="orders">
+                <TabsTrigger value="orders" className="data-[state=active]:bg-purple-100 data-[state=active]:text-purple-700">
                   {isHebrew ? 'הזמנות' : 'Orders'}
                 </TabsTrigger>
-                <TabsTrigger value="trends">
+                <TabsTrigger value="trends" className="data-[state=active]:bg-purple-100 data-[state=active]:text-purple-700">
                   {isHebrew ? 'מגמות' : 'Trends'}
                 </TabsTrigger>
               </TabsList>
@@ -236,28 +366,29 @@ export default function StaffDashboard() {
                       <thead className="bg-gray-50">
                         <tr>
                           <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Order
-                          </th>
-                          <th className="hidden sm:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Size
-                          </th>
-                          <th className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Toppings
+                            {isHebrew ? translations.he.dashboard.labels.orderNumber : translations.en.dashboard.labels.orderNumber}
                           </th>
                           <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Total
-                          </th>
-                          <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Status
+                            {isHebrew ? translations.he.dashboard.labels.status : translations.en.dashboard.labels.status}
                           </th>
                           <th className="hidden lg:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Time
+                            {isHebrew ? translations.he.dashboard.labels.time : translations.en.dashboard.labels.time}
                           </th>
                           <th className="hidden sm:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Customer
+                            <div className="flex flex-col gap-1">
+                              <span>
+                                {isHebrew ? translations.he.dashboard.labels.customer : translations.en.dashboard.labels.customer}
+                              </span>
+                              <span className="text-gray-400">
+                                {isHebrew ? translations.he.dashboard.labels.phone : translations.en.dashboard.labels.phone}
+                              </span>
+                            </div>
+                          </th>
+                          <th className="hidden lg:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            {isHebrew ? translations.he.dashboard.labels.toppings : translations.en.dashboard.labels.toppings}
                           </th>
                           <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Actions
+                            {isHebrew ? translations.he.dashboard.labels.actions : translations.en.dashboard.labels.actions}
                           </th>
                         </tr>
                       </thead>
@@ -271,17 +402,6 @@ export default function StaffDashboard() {
                               <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                 #{orderNumber}
                               </td>
-                              <td className="hidden sm:table-cell px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {translatedOrder.size}
-                              </td>
-                              <td className="hidden md:table-cell px-6 py-4 text-sm text-gray-900">
-                                <div className="max-w-xs truncate">
-                                  {displayToppings(translatedOrder)}
-                                </div>
-                              </td>
-                              <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {formatPrice(order.totalPrice)}
-                              </td>
                               <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                                 <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(order.status)}`}>
                                   {translatedOrder.status}
@@ -291,7 +411,23 @@ export default function StaffDashboard() {
                                 {formatOrderDate(order.timestamp)}
                               </td>
                               <td className="hidden sm:table-cell px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {order.customerName}
+                                <div className="flex flex-col">
+                                  <span className="font-medium">
+                                    {order.customerName}
+                                  </span>
+                                  <span className={`text-sm ${
+                                    isReturningCustomer(order.phoneNumber) 
+                                      ? 'text-blue-600' 
+                                      : 'text-yellow-600'
+                                  }`}>
+                                    {order.phoneNumber}
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="hidden lg:table-cell px-6 py-4 text-sm text-gray-900">
+                                <div className="max-w-xs truncate">
+                                  {displayToppings(translatedOrder)}
+                                </div>
                               </td>
                               <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                 <div className="flex flex-col sm:flex-row gap-2">
@@ -369,19 +505,32 @@ export default function StaffDashboard() {
                             <span className="font-medium">
                               {isHebrew ? translations.he.dashboard.labels.customer : translations.en.dashboard.labels.customer}:{' '}
                             </span>
+                            <span className="block">
                               {order.customerName}
+                              <span className={`block text-sm ${
+                                isReturningCustomer(order.phoneNumber) 
+                                  ? 'text-blue-600' 
+                                  : 'text-yellow-600'
+                              }`}>
+                                {order.phoneNumber}
+                              </span>
+                            </span>
                           </p>
                           <p className="text-sm">
                             <span className="font-medium">
                               {isHebrew ? translations.he.dashboard.labels.size : translations.en.dashboard.labels.size}:{' '}
                             </span>
+                            <span className="block">
                               {translatedOrder.size}
+                            </span>
                           </p>
                           <p className="text-sm">
                             <span className="font-medium">
                               {isHebrew ? translations.he.dashboard.labels.total : translations.en.dashboard.labels.total}:{' '}
                             </span>
-                              {formatPrice(order.totalPrice)}
+                            <span className="block">
+                              {formatPrice(translatedOrder.totalPrice)}
+                            </span>
                           </p>
                           <p className="text-sm">
                             <span className="font-medium">

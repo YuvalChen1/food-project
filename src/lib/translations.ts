@@ -61,14 +61,17 @@ export const translations = {
       title: "Staff Dashboard",
       logout: "Logout",
       labels: {
-        customer: "Customer",
-        size: "Size",
-        total: "Total",
-        toppings: "Toppings",
-        time: "Time",
         status: "Status",
+        customer: "Customer",
+        phone: "Phone",
+        time: "Time",
+        price: "Price",
+        toppings: "Toppings",
+        noToppings: "No toppings",
         actions: "Actions",
-        noToppings: "No Toppings"
+        orderNumber: "Order #",
+        size: "Size",
+        total: "Total"
       },
       actions: {
         prepare: "Prepare",
@@ -81,6 +84,10 @@ export const translations = {
         requestsPerDay: "requests/day",
         days: "days",
         recommendation: "Consider adding to menu"
+      },
+      exportDaily: "Export Daily Report",
+      exportMonthly: "Export Monthly Report",
+      statuses: {
       }
     }
   },
@@ -151,14 +158,17 @@ export const translations = {
       title: "לוח בקרה",
       logout: "התנתק",
       labels: {
-        customer: "לקוח",
-        size: "גודל",
-        total: "סה״כ",
-        toppings: "תוספות",
-        time: "זמן",
         status: "סטטוס",
+        customer: "לקוח",
+        phone: "טלפון",
+        time: "זמן",
+        price: "מחיר",
+        toppings: "תוספות",
+        noToppings: "ללא תוספות",
         actions: "פעולות",
-        noToppings: "ללא תוספות"
+        orderNumber: "הזמנה מס'",
+        size: "גודל",
+        total: "סה״כ"
       },
       actions: {
         prepare: "התחל הכנה",
@@ -171,6 +181,10 @@ export const translations = {
         requestsPerDay: "בקשות ליום",
         days: "ימים",
         recommendation: "שקול להוסיף לתפריט"
+      },
+      exportDaily: "ייצוא דוח יומי",
+      exportMonthly: "ייצוא דוח חודשי",
+      statuses: {
       }
     }
   }

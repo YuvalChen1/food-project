@@ -1,23 +1,19 @@
 "use client";
 
 import React, { useState, useRef, useCallback, useEffect } from "react";
-import Image from "next/image";
-import { Button } from "@/components/ui/button";
-import { UtensilsCrossed, Trash2, Mic, MicOff } from "lucide-react";
 import { toppings, ToppingType } from "@/data/toppings";
 import Swal from "sweetalert2";
 import { addDoc, collection, query, orderBy, limit, getDocs } from "firebase/firestore";
 import { db } from "@/firebase/config";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
 import { processAIOrder } from '@/lib/aiOrderHandler';
 import { trackUnavailableToppingRequest } from '@/lib/orderAnalysis';
 import { translations, type Language } from '@/lib/translations';
+import { Header } from "@/components/Header";
+import { PizzaCanvas } from "@/components/PizzaCanvas";
+import { ToppingSelector } from "@/components/ToppingSelector";
+import { SizeSelector } from "@/components/SizeSelector";
+import { OrderDialog } from "@/components/OrderDialog";
+import { AIChat } from "@/components/AIChat";
 
 interface Topping extends ToppingType {
   x?: number;
@@ -50,31 +46,23 @@ interface OrderData {
   phoneNumber: string;
 }
 
-interface SpeechRecognitionResult {
-  transcript: string;
-  confidence: number;
-}
-
 export default function PizzaBuilder() {
+  const [language, setLanguage] = useState<Language>('he');
   const [pizzaSize, setPizzaSize] = useState<string>("m");
   const [pizzaToppings, setPizzaToppings] = useState<Topping[]>([]);
-  // const [selectedTopping, setSelectedTopping] = useState<Topping | null>(null)
-  // const [isDragging, setIsDragging] = useState(false)
-  const pizzaRef = useRef<HTMLDivElement>(null);
-  // const draggedToppingRef = useRef<HTMLDivElement>(null)
   const [hasExtraCheese, setHasExtraCheese] = useState(false);
   const [cheesePlacement, setCheesePlacement] = useState<string>("full");
-  const [isLoading, setIsLoading] = useState(false);
+  const [activeToppingForPlacement, setActiveToppingForPlacement] = useState<Topping | null>(null);
+  const [showContactModal, setShowContactModal] = useState(false);
   const [customerName, setCustomerName] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
-  const [showContactModal, setShowContactModal] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [showAIChat, setShowAIChat] = useState(false);
   const [aiMessage, setAIMessage] = useState("");
   const [isProcessingAI, setIsProcessingAI] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const [language, setLanguage] = useState<Language>('he');
-  const [activeToppingForPlacement, setActiveToppingForPlacement] = useState<Topping | null>(null);
-  const pizzaSectionRef = useRef<HTMLDivElement>(null);
+  
+  const pizzaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const preventDefault = (e: Event) => e.preventDefault();
@@ -102,8 +90,8 @@ export default function PizzaBuilder() {
   }, []);
 
   useEffect(() => {
-    if (window.innerWidth < 640 && pizzaSectionRef.current) {
-      pizzaSectionRef.current.scrollIntoView({
+    if (window.innerWidth < 640 && pizzaRef.current) {
+      pizzaRef.current.scrollIntoView({
         behavior: 'smooth',
         block: 'start'
       });
@@ -462,7 +450,7 @@ export default function PizzaBuilder() {
             clipPath: pos.clipPath || 'none',
           }}
         >
-          <Image
+          <img
             src={topping.renderImage || topping.image}
             alt={topping.name}
             width={40}
@@ -472,7 +460,6 @@ export default function PizzaBuilder() {
               filter: "drop-shadow(2px 2px 2px rgba(0,0,0,0.2))",
               mixBlendMode: "multiply",
             }}
-            priority
           />
         </div>
       </div>
@@ -602,7 +589,7 @@ export default function PizzaBuilder() {
           console.log('All alternatives:', alternatives);
           
           // Find the best result with highest confidence
-          let bestResult: SpeechRecognitionResult = { transcript: '', confidence: 0 };
+          let bestResult: SpeechRecognitionAlternative = { transcript: '', confidence: 0 };
           let highestConfidence = 0;
           
           alternatives.forEach((result: any) => {
@@ -763,492 +750,100 @@ export default function PizzaBuilder() {
 
   return (
     <div className={`flex flex-col min-h-screen overflow-x-hidden ${language === 'he' ? 'rtl' : 'ltr'}`}>
-      <header className="bg-black text-white px-4 lg:px-6 py-4 sm:py-6">
-        <div className="container mx-auto flex items-center justify-between">
-          <a className="flex items-center justify-center" href="#">
-            <UtensilsCrossed className="h-6 w-6 sm:h-8 sm:w-8" />
-            <span className="ml-2 text-lg sm:text-xl md:text-2xl font-bold">
-              {translations[language].title}
-            </span>
-          </a>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setLanguage(language === 'en' ? 'he' : 'en')}
-            className="text-white hover:text-white border-white hover:bg-white/10 bg-transparent"
-          >
-            {language === 'en' ? 'עברית' : 'English'}
-          </Button>
-        </div>
-      </header>
+      <Header 
+        language={language}
+        translations={translations}
+        setLanguage={setLanguage}
+      />
 
-      <main className="flex-1 container mx-auto px-2 xs:px-4 py-2 xs:py-4">
-        <h1 className="text-xl xs:text-2xl sm:text-3xl md:text-4xl font-bold mb-1 xs:mb-2 sm:mb-4 mt-1 sm:mt-2 text-center whitespace-nowrap">
+      <main className="flex-1 glass-container overflow-x-hidden">
+        <h1 className="text-xl xs:text-2xl sm:text-3xl md:text-4xl font-bold mt-1 sm:mt-2 text-center whitespace-nowrap">
           {translations[language].buildPizza}
         </h1>
 
-        <div ref={pizzaSectionRef} className="flex flex-col lg:flex-row gap-2 xs:gap-4 sm:gap-8 mb-2 xs:mb-4 sm:mb-8">
-          <div className="flex-1 flex flex-col items-center">
-            <div className="relative w-full max-w-[240px] xs:max-w-[280px] sm:max-w-[350px] md:max-w-md">
-              {pizzaToppings.length > 0 && (
-                <Button
-                  onClick={handleClear}
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-[-20px] xs:right-[-30px] top-[25%] -translate-y-1/2 hover:bg-red-100 hover:text-red-600 transition-colors w-12 h-12 xs:w-16 xs:h-16 sm:w-20 sm:h-20 z-10 !p-0"
-                  title="Clear all toppings"
-                  style={{
-                    minWidth: "unset",
-                    minHeight: "unset",
-                  }}
-                >
-                  <Trash2
-                    strokeWidth={2}
-                    className="w-full h-full"
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      padding: "1rem",
-                    }}
-                  />
-                </Button>
-              )}
-
-              <div className="aspect-square relative">
-                <div
-                  ref={pizzaRef}
-                  className={`absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 rounded-full transition-all duration-300 overflow-hidden ${
-                    pizzaSize === "s"
-                      ? "w-[60%] h-[60%] sm:w-3/4 sm:h-3/4"
-                      : pizzaSize === "m"
-                      ? "w-[70%] h-[70%] sm:w-5/6 sm:h-5/6"
-                      : "w-[80%] h-[80%] sm:w-[90%] sm:h-[90%]"
-                  }`}
-                >
-                  <div className="relative w-full h-full">
-                    <Image
-                      src="/pizza-base.png"
-                      alt="Pizza base"
-                      fill
-                      className="object-cover"
-                      priority
-                    />
-                    {hasExtraCheese && (
-                      <div
-                        className="absolute inset-0 overflow-hidden"
-                        style={{
-                          clipPath:
-                            cheesePlacement === "left"
-                              ? "polygon(0 0, 50% 0, 50% 100%, 0 100%)"
-                              : cheesePlacement === "right"
-                              ? "polygon(50% 0, 100% 0, 100% 100%, 50% 100%)"
-                              : "none",
-                          transform: "scale(1.03)",
-                          transformOrigin: "center center",
-                        }}
-                      >
-                        <Image
-                          src="/pizza-cheese.png"
-                          alt="Extra cheese"
-                          fill
-                          className="object-cover"
-                          style={{
-                            transform: "scale(1)",
-                            transformOrigin: "center center",
-                          }}
-                          priority
-                        />
-                      </div>
-                    )}
-                  </div>
-                  {pizzaToppings.map((topping) => renderTopping(topping))}
-                </div>
-              </div>
+        <div className="flex flex-col lg:flex-row gap-2 xs:gap-4 sm:gap-8">
+          <div className="flex flex-col items-center lg:w-1/2">
+            <div className="w-full">
+              <PizzaCanvas
+                pizzaRef={pizzaRef}
+                pizzaSize={pizzaSize}
+                pizzaToppings={pizzaToppings}
+                hasExtraCheese={hasExtraCheese}
+                cheesePlacement={cheesePlacement}
+                handleClear={handleClear}
+                renderTopping={renderTopping}
+                translations={translations}
+                language={language}
+              />
             </div>
-
-            <div className="flex justify-center mt-1 xs:mt-2 sm:mt-4 space-x-1 xs:space-x-2 sm:space-x-4">
-              <Button
-                onClick={() => setPizzaSize("s")}
-                variant={pizzaSize === "s" ? "default" : "outline"}
-              >
-                {translations[language].sizes.small}
-              </Button>
-              <Button
-                onClick={() => setPizzaSize("m")}
-                variant={pizzaSize === "m" ? "default" : "outline"}
-              >
-                {translations[language].sizes.medium}
-              </Button>
-              <Button
-                onClick={() => setPizzaSize("l")}
-                variant={pizzaSize === "l" ? "default" : "outline"}
-              >
-                {translations[language].sizes.large}
-              </Button>
+            <div className="w-full mt-4">
+              <SizeSelector
+                pizzaSize={pizzaSize}
+                setPizzaSize={setPizzaSize}
+                translations={translations}
+                language={language}
+              />
             </div>
           </div>
 
           <div className="flex-1">
-            <div className="mt-1 xs:mt-2 lg:mt-[30px]">
+            <div className="mt-1 xs:mt-2 lg:mt-[30px] relative">
               <h2 className="text-lg xs:text-xl sm:text-2xl font-bold mb-1 xs:mb-2 sm:mb-4 text-center lg:text-center">
                 {translations[language].toppings}
               </h2>
-              <div className="grid grid-cols-4 sm:grid-cols-5 lg:grid-cols-2 xl:grid-cols-3 gap-[2px] xs:gap-1 sm:gap-4">
-                {toppings.map((topping) => (
-                  <div
-                    key={topping.name}
-                    className="relative"
-                  >
-                    {activeToppingForPlacement?.name === topping.name && (
-                      <div className="absolute -top-16 left-1/2 -translate-x-1/2 bg-white rounded-lg shadow-lg p-2 z-50 topping-placement-popup">
-                        <div className="flex gap-2">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation(); // Prevent event bubbling
-                              handlePlacementSelect('full');
-                            }}
-                            className="w-8 h-8 rounded-full border-2 border-gray-300 hover:border-blue-500 transition-colors"
-                            title="Full"
-                          >
-                            <div className="w-full h-full rounded-full bg-gray-200 hover:bg-blue-100" />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation(); // Prevent event bubbling
-                              handlePlacementSelect('left');
-                            }}
-                            className="w-8 h-8 rounded-full border-2 border-gray-300 hover:border-blue-500 transition-colors overflow-hidden"
-                            title="Left Half"
-                          >
-                            <div className="w-1/2 h-full bg-gray-200 hover:bg-blue-100" />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation(); // Prevent event bubbling
-                              handlePlacementSelect('right');
-                            }}
-                            className="w-8 h-8 rounded-full border-2 border-gray-300 hover:border-blue-500 transition-colors overflow-hidden"
-                            title="Right Half"
-                          >
-                            <div className="w-1/2 h-full bg-gray-200 hover:bg-blue-100 ml-auto" />
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                    
-                    <div className={`relative p-[2px] xs:p-1 sm:p-3 flex flex-col items-center transform transition-transform hover:scale-105 ${
-                      pizzaToppings.some(t => t.name === topping.name) ? 
-                      'ring-1 xs:ring-2 ring-blue-500 ring-offset-1 xs:ring-offset-2 rounded-full bg-blue-50' : ''
-                    }`}
-                    >
-                      {/* Add placement indicator */}
-                      {pizzaToppings.some(t => t.name === topping.name) && (
-                        <div className="absolute top-0 right-0 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center transform translate-x-1/3 -translate-y-1/3 shadow-md">
-                          {pizzaToppings.find(t => t.name === topping.name)?.placement === 'full' ? (
-                            <div className="w-4 h-4 rounded-full bg-black" />
-                          ) : pizzaToppings.find(t => t.name === topping.name)?.placement === 'left' ? (
-                            <div className="w-4 h-4 rounded-full overflow-hidden bg-white">
-                              <div className="w-1/2 h-full bg-black" />  {/* Left half black */}
-                            </div>
-                          ) : (
-                            <div className="w-4 h-4 rounded-full overflow-hidden bg-white">
-                              <div className="w-1/2 h-full bg-black float-right" />  {/* Right half black */}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      
-                      {/* Metal bowl container */}
-                      <div
-                        className={`relative w-[80%] aspect-square rounded-full min-w-[25px] xs:min-w-[30px] sm:min-w-[45px] max-w-[35px] xs:max-w-[40px] sm:max-w-[65px] lg:max-w-[75px] mx-auto ${
-                          pizzaToppings.some(t => t.name === topping.name) ? 'scale-95' : ''
-                        }`}
-                        style={{
-                          background: "linear-gradient(145deg, #d4d4d4, #e8e8e8)",
-                          boxShadow: `
-                            inset 0 4px 8px rgba(0,0,0,0.25),
-                            inset 0 -2px 4px rgba(255,255,255,0.5),
-                            0 2px 4px rgba(0,0,0,0.15)
-                          `,
-                          transform: "perspective(500px) rotateX(12deg)",
-                        }}
-                      >
-                        {/* Inner bowl shadow/highlight */}
-                        <div
-                          className="absolute inset-[2px] rounded-full pointer-events-none"
-                          style={{
-                            background:
-                              "linear-gradient(135deg, rgba(255,255,255,0.4) 0%, transparent 50%, rgba(0,0,0,0.2) 100%)",
-                            border: "1px solid rgba(255,255,255,0.2)",
-                          }}
-                        />
-
-                        {/* Topping container */}
-                        <div
-                          className="absolute inset-0 flex items-center justify-center cursor-pointer"
-                          onClick={() => handleToppingClick(topping)}
-                        >
-                          <div className={`w-[85%] h-[85%] relative ${  // Increased from w-3/4 h-3/4
-                            topping.name === "Tomatoes" ? "scale-125" : ""  // Special scale for tomatoes
-                          }`}>
-                            <Image
-                              src={topping.image}
-                              alt={topping.name}
-                              width={100}
-                              height={100}
-                              className="w-full h-full object-contain select-none"
-                              style={{
-                                backgroundColor: "transparent",
-                                mixBlendMode: "multiply",
-                                filter: "drop-shadow(0 2px 2px rgba(0,0,0,0.2)) contrast(1.1) saturate(1.2)",
-                                imageRendering: "crisp-edges",
-                              }}
-                              quality={100}
-                              unoptimized={topping.name === "Mushrooms"}
-                            />
-                          </div>
-                        </div>
-
-                        {/* Rim highlight */}
-                        <div
-                          className="absolute inset-0 rounded-full pointer-events-none"
-                          style={{
-                            background:
-                              "linear-gradient(45deg, rgba(255,255,255,0.2) 0%, transparent 70%)",
-                            border: "1px solid rgba(255,255,255,0.3)",
-                          }}
-                        />
-                      </div>
-
-                      {/* Labels */}
-                      <div className="mt-[1px] xs:mt-0.5 sm:mt-2 text-center">
-                        <p className="text-[7px] xs:text-[8px] sm:text-xs font-medium text-gray-700">
-                          {getToppingTranslation(topping.name)}
-                        </p>
-                        <p className="text-[6px] xs:text-[7px] sm:text-xs text-gray-500">
-                          {formatPrice(topping.price)}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <ToppingSelector
+                toppings={toppings}
+                pizzaToppings={pizzaToppings}
+                activeToppingForPlacement={activeToppingForPlacement}
+                handleToppingClick={handleToppingClick}
+                handlePlacementSelect={handlePlacementSelect}
+                getToppingTranslation={getToppingTranslation}
+                formatPrice={formatPrice}
+                translations={translations}
+                language={language}
+              />
             </div>
           </div>
         </div>
 
-        {/* Comment out the toppings list section */}
-        {/* 
-        <div className="hidden lg:flex flex-col items-center">
-          <div className="w-[300px]">
-            <ScrollArea className="h-32 border rounded-md p-2">
-              {pizzaToppings.map((topping) => (
-                <div
-                  key={topping.id}
-                  className="flex justify-between items-center mb-2"
-                >
-                  <span>
-                    {topping.name} ({topping.placement})
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() =>
-                      topping.id !== undefined && removeTopping(topping.id)
-                    }
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-            </ScrollArea>
-          </div>
-        </div>
-        */}
-
-        {/* Add back the order button for desktop */}
-        <div className="hidden lg:flex justify-center mt-4">
-          <Button
+        <div className="flex justify-center my-6 sm:my-8 lg:my-10">
+          <button
             onClick={handleOrderClick}
-            variant="default"
-            className="relative"
+            className="px-6 py-3 bg-black text-white rounded-md hover:bg-gray-800 transition-colors"
           >
             {language === 'he' 
               ? `${translations[language].order.complete} ${formatOrderPrice(calculateTotal())}`
               : `${translations[language].order.complete} ${formatOrderPrice(calculateTotal())}`
             }
-          </Button>
-        </div>
-
-        {/* Comment out the mobile toppings list */}
-        {/* 
-        <div className="flex-1 lg:hidden">
-          <ScrollArea className="h-32 border rounded-md p-2">
-            {pizzaToppings.map((topping) => (
-              <div
-                key={topping.id}
-                className="flex justify-between items-center mb-2"
-              >
-                <span>
-                  {topping.name} ({topping.placement})
-                </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() =>
-                    topping.id !== undefined && removeTopping(topping.id)
-                  }
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            ))}
-          </ScrollArea>
-
-          <div className="flex justify-center mt-4">
-            <Button
-              onClick={handleOrderClick}
-              variant="default"
-              className="relative"
-            >
-              {translations[language].order.complete} (${calculateTotal()})
-            </Button>
-          </div>
-        </div>
-        */}
-
-        {/* Mobile order button */}
-        <div className="flex lg:hidden justify-center mb-20 mt-4">
-          <Button
-            onClick={handleOrderClick}
-            variant="default"
-            className="relative"
-          >
-            {language === 'he' 
-              ? `${translations[language].order.complete} ${formatOrderPrice(calculateTotal())}`
-              : `${translations[language].order.complete} ${formatOrderPrice(calculateTotal())}`
-            }
-          </Button>
+          </button>
         </div>
       </main>
 
-      <Dialog open={showContactModal} onOpenChange={setShowContactModal}>
-        <DialogContent className={`sm:max-w-[425px] ${language === 'he' ? 'rtl text-right [&>button]:left-4 [&>button]:right-auto' : 'ltr text-left'}`}>
-          <DialogHeader className={`${language === 'he' ? 'ml-8' : 'mr-8'}`}>
-            <DialogTitle className={language === 'he' ? 'text-right' : 'text-left'}>
-              {translations[language].contact.title}
-            </DialogTitle>
-            <DialogDescription className={language === 'he' ? 'text-right' : 'text-left'}>
-              {translations[language].contact.description}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">
-                {translations[language].contact.name}
-              </label>
-              <input
-                type="text"
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
-                className={`w-full p-2 border rounded-md ${language === 'he' ? 'text-right' : 'text-left'}`}
-                placeholder={translations[language].contact.namePlaceholder}
-                maxLength={15}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">
-                {translations[language].contact.phone}
-              </label>
-              <input
-                type="tel"
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
-                className={`w-full p-2 border rounded-md ${language === 'he' ? 'text-right' : 'text-left'}`}
-                placeholder={translations[language].contact.phonePlaceholder}
-                maxLength={10}
-                required
-              />
-            </div>
-            <div className={`flex ${language === 'he' ? 'flex-row-reverse' : ''} justify-end space-x-2 pt-4`}>
-              <Button variant="outline" onClick={() => setShowContactModal(false)}>
-                {translations[language].order.cancel}
-              </Button>
-              <Button onClick={handleCompleteOrder} disabled={isLoading}>
-                {isLoading ? (
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  translations[language].order.confirmOrder
-                )}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <OrderDialog
+        showContactModal={showContactModal}
+        setShowContactModal={setShowContactModal}
+        customerName={customerName}
+        setCustomerName={setCustomerName}
+        phoneNumber={phoneNumber}
+        setPhoneNumber={setPhoneNumber}
+        handleCompleteOrder={handleCompleteOrder}
+        isLoading={isLoading}
+        language={language}
+        translations={translations}
+      />
 
-      <Button
-        onClick={() => setShowAIChat(true)}
-        className="fixed bottom-6 right-4 rounded-full bg-blue-500 hover:bg-blue-600 text-white z-50"
-      >
-        {language === 'he' ? '🤖 AI הזמן עם ' : '🤖 Order with AI'}
-      </Button>
-
-      <Dialog open={showAIChat} onOpenChange={setShowAIChat}>
-        <DialogContent className={`sm:max-w-[425px] ${language === 'he' ? 'rtl text-right' : 'ltr text-left'}`}>
-          <DialogHeader className={`${language === 'he' ? 'ml-8' : 'mr-8'}`}>
-            <DialogTitle 
-              className={language === 'he' ? 'text-right' : 'text-left'}
-              dangerouslySetInnerHTML={{ __html: translations[language].ai.title }}
-            />
-            <DialogDescription 
-              className={language === 'he' ? 'text-right' : 'text-left'}
-              dangerouslySetInnerHTML={{ __html: translations[language].ai.description }}
-            />
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="flex flex-col gap-4">
-              <div className="relative">
-                <textarea
-                  value={aiMessage}
-                  onChange={(e) => setAIMessage(e.target.value)}
-                  placeholder={translations[language].ai.placeholder}
-                  className={`flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
-                    language === 'he' ? 'text-right' : 'text-left'
-                  }`}
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className={`absolute ${language === 'he' ? 'left-2' : 'right-2'} bottom-2`}
-                  onClick={startListening}
-                  disabled={isListening}
-                >
-                  {isListening ? (
-                    <MicOff className="h-4 w-4 text-red-500 animate-pulse" />
-                  ) : (
-                    <Mic className="h-4 w-4" />
-                  )}
-                </Button>
-              </div>
-              <Button 
-                onClick={handleAIChat} 
-                disabled={isProcessingAI || !aiMessage.trim()}
-              >
-                {isProcessingAI ? (
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    {translations[language].ai.processing}
-                  </div>
-                ) : (
-                  translations[language].ai.send
-                )}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <AIChat
+        showAIChat={showAIChat}
+        setShowAIChat={setShowAIChat}
+        aiMessage={aiMessage}
+        setAIMessage={setAIMessage}
+        isListening={isListening}
+        startListening={startListening}
+        handleAIChat={handleAIChat}
+        isProcessingAI={isProcessingAI}
+        language={language}
+        translations={translations}
+      />
     </div>
   );
 }
