@@ -787,21 +787,23 @@ export default function PizzaBuilder() {
           </div>
 
           <div className="flex-1">
-            <div className="mt-1 xs:mt-2 lg:mt-[30px] relative">
+            <div className="mt-1 xs:mt-2 lg:mt-[30px] relative px-2 xs:px-3 sm:px-4">
               <h2 className="text-lg xs:text-xl sm:text-2xl font-bold mb-1 xs:mb-2 sm:mb-4 text-center lg:text-center">
                 {translations[language].toppings}
               </h2>
-              <ToppingSelector
-                toppings={toppings}
-                pizzaToppings={pizzaToppings}
-                activeToppingForPlacement={activeToppingForPlacement}
-                handleToppingClick={handleToppingClick}
-                handlePlacementSelect={handlePlacementSelect}
-                getToppingTranslation={getToppingTranslation}
-                formatPrice={formatPrice}
-                translations={translations}
-                language={language}
-              />
+              <div className="px-1 xs:px-2 sm:px-0">
+                <ToppingSelector
+                  toppings={toppings}
+                  pizzaToppings={pizzaToppings}
+                  activeToppingForPlacement={activeToppingForPlacement}
+                  handleToppingClick={handleToppingClick}
+                  handlePlacementSelect={handlePlacementSelect}
+                  getToppingTranslation={getToppingTranslation}
+                  formatPrice={formatPrice}
+                  translations={translations}
+                  language={language}
+                />
+              </div>
             </div>
           </div>
         </div>

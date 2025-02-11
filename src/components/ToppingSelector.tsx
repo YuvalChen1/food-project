@@ -25,14 +25,14 @@ export function ToppingSelector({
   language
 }: ToppingSelectorProps) {
   return (
-    <div className="grid grid-cols-4 sm:grid-cols-5 lg:grid-cols-2 xl:grid-cols-3 gap-[2px] xs:gap-1 sm:gap-4">
+    <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-3 gap-2 xs:gap-3 sm:gap-4 relative">
       {toppings.map((topping) => (
         <div
           key={topping.name}
           className="relative"
         >
           {activeToppingForPlacement?.name === topping.name && (
-            <div className="absolute -top-16 left-1/2 -translate-x-1/2 bg-white shadow-xl p-2 z-50 topping-placement-popup border-2 border-gray-200">
+            <div className="absolute -top-20 left-1/2 -translate-x-1/2 bg-white shadow-xl p-2 z-50 topping-placement-popup border-2 border-gray-200 min-w-[120px]">
               <div className="flex gap-2">
                 <button
                   onClick={(e) => {
@@ -73,22 +73,22 @@ export function ToppingSelector({
           )}
           
           <div 
-            className={`relative p-[2px] xs:p-1 sm:p-3 flex flex-col items-center transform transition-transform hover:scale-105 ${
+            className={`relative p-2 xs:p-3 sm:p-4 flex flex-col items-center transform transition-transform hover:scale-105 group ${
               pizzaToppings.some(t => t.name === topping.name) ? 
-              'ring-1 xs:ring-2 ring-black ring-offset-1 xs:ring-offset-2 rounded-full bg-gradient-to-br from-rose-100/80 to-teal-100/80 backdrop-blur-sm cursor-pointer' : ''
+              'ring-2 ring-black ring-offset-2 rounded-full bg-gradient-to-br from-rose-100/80 to-teal-100/80 backdrop-blur-sm cursor-pointer' : ''
             }`}
             onClick={() => pizzaToppings.some(t => t.name === topping.name) ? handleToppingClick(topping) : undefined}
           >
             {pizzaToppings.some(t => t.name === topping.name) && (
-              <div className="absolute top-0 right-0 w-6 h-6 bg-black rounded-full flex items-center justify-center transform translate-x-1/3 -translate-y-1/3 shadow-md">
+              <div className="absolute top-0 right-0 w-5 h-5 sm:w-6 sm:h-6 bg-black rounded-full flex items-center justify-center transform translate-x-1/4 -translate-y-1/4 shadow-md">
                 {pizzaToppings.find(t => t.name === topping.name)?.placement === 'full' ? (
-                  <div className="w-4 h-4 rounded-full bg-black" />
+                  <div className="w-3 h-3 sm:w-4 sm:h-4 rounded-full bg-black" />
                 ) : pizzaToppings.find(t => t.name === topping.name)?.placement === 'left' ? (
-                  <div className="w-4 h-4 rounded-full overflow-hidden bg-white">
+                  <div className="w-3 h-3 sm:w-4 sm:h-4 rounded-full overflow-hidden bg-white">
                     <div className="w-1/2 h-full bg-black" />
                   </div>
                 ) : (
-                  <div className="w-4 h-4 rounded-full overflow-hidden bg-white">
+                  <div className="w-3 h-3 sm:w-4 sm:h-4 rounded-full overflow-hidden bg-white">
                     <div className="w-1/2 h-full bg-black float-right" />
                   </div>
                 )}
